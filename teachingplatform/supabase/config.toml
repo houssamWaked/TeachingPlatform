@@ -1,0 +1,4 @@
+project_id = "lesson-portal"
+
+[functions.api]
+verify_jwt = false

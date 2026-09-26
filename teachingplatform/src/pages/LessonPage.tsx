@@ -247,6 +247,7 @@ export function LessonPage() {
                     onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
                   >
                     {sidebarCollapsed ? <ArrowRight aria-hidden="true" /> : <ArrowLeft aria-hidden="true" />}
+                    <span>{sidebarCollapsed ? tx("Expand", "توسيع") : tx("Collapse", "طي")}</span>
                   </button>
                 </div>
                 {lessonTabs.map((item) => {
@@ -292,7 +293,7 @@ export function LessonPage() {
                 <p>{lesson.description}</p>
               </header>
             )}
-            {videoParts.length > 1 && (
+            {tab === "content" && videoParts.length > 1 && (
               <nav className="lesson-video-switcher" aria-label={tx("Choose a video", "اختر فيديو")}>
                 {videoParts.map((part, index) => {
                   const current = part.id === activeVideoPart?.id;
@@ -313,7 +314,7 @@ export function LessonPage() {
               </nav>
             )}
 
-            {activeVideoPart && (
+            {tab === "content" && activeVideoPart && (
               <section className="lesson-feature-media" aria-label={tx("Lesson video", "فيديو الدرس")}>
                 <SecureVideo
                   key={activeVideoPart.id}

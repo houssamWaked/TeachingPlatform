@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { BookOpen, ClipboardText, DeviceMobile, DownloadSimple, List, LockKey, MagnifyingGlass, MonitorPlay, Plus, Trash, UserCircle, UsersThree, X } from "@phosphor-icons/react";
+import { BookOpen, ClipboardText, DeviceMobile, DownloadSimple, LockKey, MagnifyingGlass, MonitorPlay, Plus, Trash, UserCircle, UsersThree, X } from "@phosphor-icons/react";
 import { api, isDemoMode, type StudentAnswer } from "../lib/api";
 import type { Lesson, Student } from "../types";
 import { Shell } from "../context/LocaleContext";
@@ -166,19 +166,8 @@ export function AdminPage() {
     }
   }
   return (
-    <Shell admin>
+    <Shell admin onOpenAdminMenu={() => setMobileNavOpen(true)} adminMenuOpen={mobileNavOpen}>
       <main className="admin-layout" id="main-content" tabIndex={-1}>
-        <button
-          type="button"
-          className="admin-mobile-menu-trigger"
-          aria-expanded={mobileNavOpen}
-          aria-controls="admin-navigation-drawer"
-          onClick={() => setMobileNavOpen(true)}
-        >
-          <List aria-hidden="true" />
-          <span>{tx("Manage", "الإدارة")}</span>
-          <span className="admin-mobile-current-view">{tx(({ lessons: "Lessons", codes: "Access codes", students: "Students", answers: "Student answers", forensic: "Forensic" })[view], ({ lessons: "الدروس", codes: "رموز الدخول", students: "الطلاب", answers: "إجابات الطلاب", forensic: "التحقق الجنائي" })[view])}</span>
-        </button>
         {mobileNavOpen && <button type="button" className="admin-mobile-drawer-backdrop" aria-label={tx("Close navigation menu", "إغلاق قائمة التنقل")} onClick={() => setMobileNavOpen(false)} />}
         <aside id="admin-navigation-drawer" className={`admin-sidebar${mobileNavOpen ? " mobile-open" : ""}`} inert={isMobileViewport && !mobileNavOpen}>
           <div className="admin-sidebar-mobile-head">

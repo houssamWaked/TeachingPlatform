@@ -272,7 +272,6 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
   return (
     <div className="builder-backdrop">
       <section className="lesson-builder live-builder">
-        <div className="builder-mobile-status-bar" aria-hidden="true"><span>9:41</span><span className="builder-mobile-status-icons"><img src={theme === "dark" ? "/figma/dark-lesson-builder-mobile-ios-signal.svg" : "/figma/lesson-builder-mobile-ios-signal.svg"} alt="" /><img src={theme === "dark" ? "/figma/dark-lesson-builder-mobile-ios-wifi-signal.svg" : "/figma/lesson-builder-mobile-ios-wifi-signal.svg"} alt="" /><img src={theme === "dark" ? "/figma/dark-lesson-builder-mobile-ios-battery-full.svg" : "/figma/lesson-builder-mobile-ios-battery-full.svg"} alt="" /></span></div>
         <header className="builder-top">
           <div><small><span className="builder-desktop-status-prefix">{tx("LESSON BUILDER", "محرر الدرس")} · </span>{lesson.published ? tx("PUBLISHED", "منشور") : tx("DRAFT", "مسودة")}</small><h2>{lesson.title || tx("Untitled lesson", "درس بلا عنوان")}</h2></div>
           <div>
@@ -299,11 +298,13 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
             <article className="live-page-canvas" style={pageStyle} onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropOn(event, destination, tabBlocks.length)}>
               <div className="live-page-title"><h1>{lesson.title || tx("Untitled lesson", "درس بلا عنوان")}</h1>{lesson.description && <p>{lesson.description}</p>}</div>
               <div className="builder-tab-strip">
+                <button type="button" className="mobile-components-trigger" aria-expanded={mobileComponentsOpen} aria-label={tx("Add a content component", "إضافة مكوّن للمحتوى")} onClick={() => { if (currentTabId === "__quiz__") setActiveTab(content.tabs?.[0]?.id ?? ""); setMobileComponentsOpen((open) => !open); }}><Plus aria-hidden="true" />{tx("Component", "مكوّن")}</button>
+                <button className="builder-add-tab" onClick={addTab}>＋ {tx("Tab", "علامة")}</button>
+                {!content.quizEnabled && <button className="builder-add-quiz-tab" aria-label={tx("Add quiz tab", "إضافة علامة تبويب اختبار")} onClick={addQuiz}>＋ {tx("Quiz", "اختبار")}</button>}
                 {(content.tabs ?? []).map((tab) => <button className={currentTabId === tab.id ? "active" : ""} key={tab.id} onClick={() => { setActiveTab(tab.id); setSelected(""); setPlacementError(""); }}>{tab.title}</button>)}
                 {content.quizEnabled && <button className={currentTabId === "__quiz__" ? "active" : ""} onClick={() => { setActiveTab("__quiz__"); setSelected(""); setPlacementError(""); }}>{content.quizTitle || tx("Quiz", "اختبار")}</button>}
-                <button onClick={addTab}>＋ {tx("Add tab", "إضافة علامة تبويب")}</button>
-                {!content.quizEnabled && <button onClick={addQuiz}>＋ {tx("Add quiz tab", "إضافة علامة تبويب اختبار")}</button>}
               </div>
+              {mobileComponentsOpen && <div className="mobile-builder-palette"><ComponentPalette onAdd={(type) => { addBlock(type); setMobileComponentsOpen(false); }} onDragStart={startNewDrag} /></div>}
               <div className="builder-tab-content">
                 {currentTabId === "__quiz__" ? <>
                   <div className="tab-title-edit"><label>{tx("Quiz tab name", "اسم علامة تبويب الاختبار")}<input value={content.quizTitle || tx("Quiz", "اختبار")} onChange={(event) => setContent({ ...content, quizTitle: event.target.value })} /></label><button className="secondary-button" onClick={() => { setContent({ ...content, quizEnabled: false }); setQuestions([]); setActiveTab(content.tabs?.[0]?.id ?? ""); }}>{tx("Remove quiz tab", "إزالة علامة تبويب الاختبار")}</button></div>
@@ -318,8 +319,8 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
           </main>
           <aside className={`properties-panel${mobileSettingsOpen ? "" : " mobile-settings-collapsed"}`}>
             <div className="panel-title"><strong>{selectedBlock ? tx("Block settings", "إعدادات المكوّن") : tx("Lesson settings", "إعدادات الدرس")}</strong>{!selectedBlock && <p>{tx("Select a block to edit its content and appearance.", "اختر مكوّناً لتعديل محتواه ومظهره.")}</p>}{selectedBlock && <button aria-label={tx("Delete selected item", "حذف العنصر المحدد")} onClick={deleteSelected}><Trash /></button>}</div>
-            <div className="builder-mobile-drawer-handle" aria-hidden="true" />
-            <div className="builder-mobile-drawer-heading"><strong>{tx("Lesson configurations", "إعدادات الدرس")}</strong><button type="button" onClick={() => setMobileSettingsOpen((open) => !open)}>{mobileSettingsOpen ? tx("Hide", "إخفاء") : tx("Show", "إظهار")}</button></div>
+            <button type="button" className="builder-mobile-drawer-handle" aria-label={mobileSettingsOpen ? tx("Hide settings", "إخفاء الإعدادات") : tx("Show settings", "إظهار الإعدادات")} aria-expanded={mobileSettingsOpen} onClick={() => setMobileSettingsOpen((open) => !open)}><span aria-hidden="true" /></button>
+            {mobileSettingsOpen && <div className="builder-mobile-drawer-heading"><strong>{tx(selectedBlock ? "Block settings" : "Lesson settings", selectedBlock ? "إعدادات المكوّن" : "إعدادات الدرس")}</strong>{selectedBlock && <button type="button" className="mobile-block-delete" aria-label={tx("Delete selected item", "حذف العنصر المحدد")} onClick={deleteSelected}><Trash aria-hidden="true" /></button>}</div>}
             {mobileSettingsOpen && <>
               <div className="mobile-builder-settings">
                 <label>{tx("Lesson Title", "عنوان الدرس")}<input value={lesson.title} onChange={(event) => update({ title: event.target.value })} /></label>
@@ -327,8 +328,6 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
               </div>
               <label className="mobile-card-image-picker" htmlFor="builder-card-image-input-mobile"><img src={theme === "dark" ? "/figma/dark-lesson-builder-mobile-image.svg" : "/figma/lesson-builder-desktop-image.svg"} alt="" /><span>{uploadingCardImage ? tx("Uploading image…", "جارٍ رفع الصورة…") : content.pageStyle?.cardImageName || tx("Upload lesson card image…", "ارفع صورة بطاقة الدرس…")}</span><input id="builder-card-image-input-mobile" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy || uploadingCardImage} onChange={(event) => { void uploadCardImage(event.target.files?.[0]); event.target.value = ""; }} /></label>
               <button type="button" className="mobile-builder-save" disabled={busy} aria-busy={busy} onClick={() => void save()}>{busy && <span className="ui-spinner" aria-hidden="true" />}{tx("Save Changes", "حفظ التغييرات")}</button>
-              <button className="mobile-builder-add" type="button" aria-expanded={mobileComponentsOpen} onClick={() => setMobileComponentsOpen((open) => !open)}><Plus aria-hidden="true" />{tx("Add content block to tab", "أضف مكوّناً إلى علامة التبويب")}</button>
-              {mobileComponentsOpen && <div className="mobile-builder-palette"><ComponentPalette onAdd={(type) => { addBlock(type); setMobileComponentsOpen(false); }} onDragStart={startNewDrag} /></div>}
               {selectedBlock ? <BlockInspector block={selectedBlock} onChange={(patch) => updateBlock(selectedBlock.id, patch)} uploadVideo={uploadVideo} uploadPdf={uploadPdf} uploadImage={uploadImage} busy={busy} uploading={uploading?.blockId === selectedBlock.id ? uploading.type : undefined} lesson={lesson} onMoveVideoPart={(direction) => moveVideoPart(selectedBlock.id, selectedLocation, direction)} canMoveVideoPartUp={selectedVideoIndex > 0} canMoveVideoPartDown={selectedVideoIndex >= 0 && selectedVideoIndex < selectedVideoBlocks.length - 1} videoPartNumber={selectedBlock.type === "video" && selectedVideoIndex >= 0 ? selectedVideoIndex + 1 : undefined} /> : <div className="builder-settings-empty"><img src={theme === "dark" ? "/figma/dark-lesson-builder-desktop-settings.svg" : "/figma/lesson-builder-desktop-settings.svg"} alt="" /><p>{tx("No block selected. Click any element inside the workspace to configure.", "لم يتم تحديد مكوّن. انقر فوق أي عنصر في مساحة العمل لتعديله.")}</p></div>}
             </>}
           </aside>

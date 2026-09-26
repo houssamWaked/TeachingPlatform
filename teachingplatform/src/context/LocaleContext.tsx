@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GearSix, MoonStars, SignOut, Sun } from "@phosphor-icons/react";
+import { GearSix, List, MoonStars, SignOut, Sun } from "@phosphor-icons/react";
 import { api } from "../lib/api";
 import { LocaleContext, useLocale } from "./LocaleState";
 import { ThemeContext, useTheme, type Theme } from "./ThemeState";
@@ -48,7 +48,7 @@ export function Brand() {
   );
 }
 
-export function Shell({ children, admin = false, hideHeader = false }: { children: React.ReactNode; admin?: boolean; hideHeader?: boolean }) {
+export function Shell({ children, admin = false, hideHeader = false, onOpenAdminMenu, adminMenuOpen = false }: { children: React.ReactNode; admin?: boolean; hideHeader?: boolean; onOpenAdminMenu?: () => void; adminMenuOpen?: boolean }) {
   const navigate = useNavigate();
   const { tx } = useLocale();
   return (
@@ -58,6 +58,14 @@ export function Shell({ children, admin = false, hideHeader = false }: { childre
         <button className="brand" onClick={() => navigate(admin ? "/admin" : "/")}>
           <Brand />
         </button>
+        {admin && onOpenAdminMenu && <button
+          type="button"
+          className="admin-header-drawer-trigger"
+          aria-label={tx("Open navigation menu", "فتح قائمة التنقل")}
+          aria-expanded={adminMenuOpen}
+          aria-controls="admin-navigation-drawer"
+          onClick={onOpenAdminMenu}
+        ><List aria-hidden="true" /></button>}
         <nav className="header-actions">
           {admin ? (
             <span className="admin-chip"><GearSix /> {tx("Teacher workspace", "مساحة المعلّم")}</span>

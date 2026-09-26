@@ -18,7 +18,7 @@ Without `VITE_API_BASE_URL`, the UI runs in demo mode (student code `LESSON26`, 
 3. Set allowed referrers to your deployed frontend hostname (and localhost during development). Copy the exact CDN hostname shown on the library API screen into `BUNNY_STREAM_CDN_HOST` (hostname only, without `https://`).
 4. Upload videos from `/admin`. Bunny assigns each video a GUID; the app stores that GUID in the existing `lessons.video_id` column. Allow Bunny time to encode each new upload before playback.
 
-The app signs HLS playlist URLs server-side for 12 minutes. The browser receives only that short-lived signed URL and loads it through hls.js (or native HLS where available). A visible student name, redemption code, and local timestamp are overlaid and repositioned every 30 seconds. This is a deterrent, not DRM; screen recording remains possible.
+The app signs HLS playlist URLs server-side for 12 minutes. The browser receives only that short-lived signed URL and loads it through hls.js (or native HLS where available). Lesson pages display a subtle, session-specific pseudonymous watermark code; the learner's name and redemption code are not embedded. This is a deterrent, not DRM; screen recording remains possible.
 
 ## Supabase setup
 
@@ -32,6 +32,7 @@ supabase secrets set BUNNY_STREAM_LIBRARY_ID=YOUR_LIBRARY_ID
 supabase secrets set BUNNY_STREAM_CDN_HOST=YOUR_CDN_HOST
 supabase secrets set BUNNY_STREAM_API_KEY=YOUR_LIBRARY_API_KEY
 supabase secrets set BUNNY_STREAM_SIGNING_KEY=YOUR_TOKEN_SECURITY_KEY
+supabase secrets set FORENSIC_WATERMARK_SECRET=YOUR_RANDOM_WATERMARK_SECRET
 supabase secrets set ADMIN_PASSWORD=YOUR_LONG_ADMIN_PASSWORD
 supabase secrets set ALLOWED_ORIGIN=https://YOUR_FRONTEND_DOMAIN
 supabase functions deploy api --no-verify-jwt
@@ -46,6 +47,7 @@ Copy `.env.example` to `.env.local` and set only `VITE_API_BASE_URL` for the fro
 - Bunny token authentication uses a 12-minute expiry. HLS requests use the signed playlist URL; token authentication must be enabled in the Bunny library.
 - PDFs remain in the private `lesson-pdfs` bucket and use five-minute signed URLs.
 - Right-click, selection, printing, common devtools shortcuts, and visible developer-tools playback remain browser deterrents. Bunny Stream does not prevent screen recording.
+- The web capture monitor only sees `getDisplayMedia()` streams initiated through the current page realm. It cannot detect OS screenshots, browser chrome capture, external recording software, extensions, or external cameras. See [capture protection capabilities and limits](docs/capture-protection.md).
 
 ## Test end to end
 

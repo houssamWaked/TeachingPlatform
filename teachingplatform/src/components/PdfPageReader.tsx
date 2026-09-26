@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { GlobalWorkerOptions, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { api } from "../lib/api";
+import { useLocale } from "../context/LocaleContext";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
 export function PdfPageReader({ lessonId, documentPath, admin = false, onViewed }: { lessonId: string; documentPath?: string; admin?: boolean; onViewed?: () => void }) {
+  const { tx } = useLocale();
   const stackRef = useRef<HTMLDivElement>(null);
   const canvasRefs = useRef(new Map<number, HTMLCanvasElement>());
   const onViewedRef = useRef(onViewed);
@@ -16,10 +18,17 @@ export function PdfPageReader({ lessonId, documentPath, admin = false, onViewed 
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<number[]>([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [rendering, setRendering] = useState(false);
+  const [firstPageRendered, setFirstPageRendered] = useState(false);
 
   useEffect(() => {
     let active = true;
     let loadingTask: PDFDocumentLoadingTask | undefined;
+    setLoading(true);
+    setRendering(false);
+    setFirstPageRendered(false);
+    setError("");
     (async () => {
       try {
         const result = documentPath
@@ -29,8 +38,17 @@ export function PdfPageReader({ lessonId, documentPath, admin = false, onViewed 
         loadingTask = getDocument({ url: result.url });
         const loaded = await loadingTask.promise;
         if (!active) { await loadingTask.destroy(); return; }
-        setDoc(loaded); setError(""); onViewedRef.current?.();
-      } catch (e) { if (active) setError(e instanceof Error ? e.message : "Could not load the document."); }
+        setDoc(loaded);
+        setRendering(loaded.numPages > 0);
+        setError("");
+        setLoading(false);
+        onViewedRef.current?.();
+      } catch (e) {
+        if (active) {
+          setError(e instanceof Error ? e.message : "Could not load the document.");
+          setLoading(false);
+        }
+      }
     })();
     return () => { active = false; if (loadingTask) void loadingTask.destroy(); };
   }, [lessonId, documentPath, admin]);
@@ -54,8 +72,15 @@ export function PdfPageReader({ lessonId, documentPath, admin = false, onViewed 
         canvas.style.height = `${viewport.height}px`;
         context.setTransform(ratio, 0, 0, ratio, 0, 0);
         await pdfPage.render({ canvas, canvasContext: context, viewport }).promise;
+        if (number === 1 && active) setFirstPageRendered(true);
       }
-    })().catch((e) => active && setError(e instanceof Error ? e.message : "Could not render this page."));
+      if (active) setRendering(false);
+    })().catch((e) => {
+      if (active) {
+        setError(e instanceof Error ? e.message : "Could not render this page.");
+        setRendering(false);
+      }
+    });
     return () => { active = false; };
   }, [doc, scale]);
 
@@ -87,19 +112,21 @@ export function PdfPageReader({ lessonId, documentPath, admin = false, onViewed 
     if (found.length) goToPage(found[0]);
   }
 
-  return <div className="pdf-reader">
-    {error && <p className="form-error">{error}</p>}
+  const isBusy = loading || (rendering && !firstPageRendered);
+  return <div className="pdf-reader" aria-busy={isBusy}>
+    {error && <p className="form-error" role="alert">{error}</p>}
+    {isBusy && <p className="document-reader-loading" role="status"><span className="ui-spinner" aria-hidden="true" />{loading ? "Opening PDF…" : "Rendering PDF…"}</p>}
     {doc && <>
       <div className="pdf-reader-toolbar">
-        <button className="secondary-button" disabled={page <= 1} onClick={() => goToPage(page - 1)}>Previous</button>
-        <span>Page {page} of {doc.numPages}</span>
-        <button className="secondary-button" disabled={page >= doc.numPages} onClick={() => goToPage(page + 1)}>Next</button>
+        <button className="secondary-button" disabled={page <= 1} onClick={() => goToPage(page - 1)}>{tx("Previous", "السابق")}</button>
+        <span>{tx("Page", "صفحة")} {page} {tx("of", "من")} {doc.numPages}</span>
+        <button className="secondary-button" disabled={page >= doc.numPages} onClick={() => goToPage(page + 1)}>{tx("Next", "التالي")}</button>
         <button className="secondary-button" onClick={() => setScale((s) => Math.max(.6, s - .15))}>−</button>
         <button className="secondary-button" onClick={() => setScale((s) => Math.min(2, s + .15))}>+</button>
       </div>
       <form className="pdf-reader-search" onSubmit={(e) => { e.preventDefault(); void search(); }}>
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find text in this document" />
-        <button className="secondary-button">Find</button>
+        <button className="secondary-button">{tx("Find", "بحث")}</button>
         {matches.length > 0 && <span>{matches.length} page{matches.length === 1 ? "" : "s"} found</span>}
       </form>
       <div className="pdf-page-wrap" ref={stackRef}>

@@ -6,6 +6,7 @@ import { BackButton } from "./BackButton";
 type TeacherAuthUIProps = {
   password: string;
   loginError: string;
+  loading: boolean;
   demoMode: boolean;
   onPasswordChange: (password: string) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
@@ -38,6 +39,7 @@ function Typewriter({ text }: { text: string }) {
 export function TeacherAuthUI({
   password,
   loginError,
+  loading,
   demoMode,
   onPasswordChange,
   onSubmit,
@@ -91,7 +93,8 @@ export function TeacherAuthUI({
             </div>
 
             {loginError && <p className="form-error" role="alert">{loginError}</p>}
-            <button className="primary-button teacher-auth-submit">
+            <button className="primary-button teacher-auth-submit" disabled={loading} aria-busy={loading}>
+              {loading && <span className="ui-spinner" aria-hidden="true" />}
               {tx("Sign in", "تسجيل الدخول")} <ArrowRight aria-hidden="true" />
             </button>
             {demoMode && (

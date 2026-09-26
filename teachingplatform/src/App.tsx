@@ -14,6 +14,8 @@ export default function App() {
         <Route path="/dashboard" element={<RequireStudent><Dashboard /></RequireStudent>} />
         <Route path="/lessons/:id" element={<RequireStudent><LessonPage /></RequireStudent>} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/answers/:lessonId" element={<AdminPage />} />
+        <Route path="/admin/answers/:lessonId/:studentId" element={<AdminPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </LocaleProvider>

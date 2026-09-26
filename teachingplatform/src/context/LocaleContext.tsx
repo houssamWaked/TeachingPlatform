@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { GearSix, GraduationCap, SignOut } from "@phosphor-icons/react";
 import { api } from "../lib/api";
 type Locale = "en" | "ar";
@@ -62,46 +62,28 @@ export function LanguageToggle() {
   );
 }
 
-export function Shell({
-  children,
-  admin = false,
-}: {
-  children: React.ReactNode;
-  admin?: boolean;
-}) {
+export function Shell({ children, admin = false, hideHeader = false }: { children: React.ReactNode; admin?: boolean; hideHeader?: boolean }) {
   const navigate = useNavigate();
   const { tx } = useLocale();
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">{tx("Skip to content", "انتقل إلى المحتوى")}</a>
-      <header className="site-header">
-        <button
-          className="brand"
-          onClick={() => navigate(admin ? "/admin" : "/")}
-        >
+      {!hideHeader && <header className="site-header">
+        <button className="brand" onClick={() => navigate(admin ? "/admin" : "/")}>
           <Brand />
         </button>
         <nav className="header-actions">
           {admin ? (
-            <span className="admin-chip">
-              <GearSix /> {tx("Teacher workspace", "مساحة المعلّم")}
-            </span>
+            <span className="admin-chip"><GearSix /> {tx("Teacher workspace", "مساحة المعلّم")}</span>
           ) : (
-            <NavLink to="/dashboard">{tx("My lessons", "دروسي")}</NavLink>
+            null
           )}
           <LanguageToggle />
-          <button
-            className="icon-button"
-            aria-label={tx("Sign out", "تسجيل الخروج")}
-            onClick={() => {
-              api.signOut();
-              navigate("/");
-            }}
-          >
+          <button className="icon-button" aria-label={tx("Sign out", "تسجيل الخروج")} onClick={() => { api.signOut(); navigate("/"); }}>
             <SignOut />
           </button>
         </nav>
-      </header>
+      </header>}
       {children}
     </div>
   );

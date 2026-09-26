@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Lesson, LessonBlock } from "../types";
 import { LessonBlockRenderer } from "./lesson-builder/LessonBlockRenderer";
+import { useLocale } from "../context/LocaleContext";
 
 export function LessonTabContent({ blocks, lesson, video, admin = false, onPdfViewed }: {
   blocks: LessonBlock[];
@@ -9,6 +10,7 @@ export function LessonTabContent({ blocks, lesson, video, admin = false, onPdfVi
   admin?: boolean;
   onPdfViewed?: () => void;
 }) {
+  const { tx } = useLocale();
   const videoBlocks = blocks.filter((block) => block.type === "video");
   // Older lessons stored one video ID on the lesson itself. Bind it to only
   // one existing video block while newly uploaded parts use their own IDs.
@@ -28,13 +30,13 @@ export function LessonTabContent({ blocks, lesson, video, admin = false, onPdfVi
       if (block.type === "video" && playableVideos.some((item) => item.id === block.id)) {
         if (playlistInserted) return null;
         playlistInserted = true;
-        return <section className="lesson-video-playlist" key="lesson-video-playlist" aria-label="Lesson video parts">
+        return <section className="lesson-video-playlist" key="lesson-video-playlist" aria-label={tx("Lesson video parts", "أجزاء فيديو الدرس")}>
           <aside className="lesson-video-picker">
-            <h2>Lesson parts</h2>
-            <nav aria-label="Choose a video part">
+            <h2>{tx("Lesson parts", "أجزاء الدرس")}</h2>
+            <nav aria-label={tx("Choose a video part", "اختر جزءاً من الفيديو")}>
               {playableVideos.map((item, index) => <button key={item.id} className={item.id === activeVideo.id ? "active" : ""} aria-current={item.id === activeVideo.id ? "true" : undefined} onClick={() => setActiveVideoId(item.id)}>
                 <span className="video-part-number">{String(index + 1).padStart(2, "0")}</span>
-                <span>Part {index + 1}</span>
+                <span>{item.title?.trim() || `${tx("Part", "الجزء")} ${index + 1}`}</span>
               </button>)}
             </nav>
           </aside>

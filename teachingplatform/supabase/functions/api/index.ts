@@ -20,6 +20,11 @@ const randomCode = () =>
     .replace(/(.{4})/, "$1-");
 const fail = (message: string, status = 400) =>
   json({ error: message }, status);
+const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+const hmacHex = async (secret: string, message: string) => {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return hex(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message))));
+};
 const lessonHasContentVideo = (content: unknown): boolean => {
   if (!content || typeof content !== "object") return false;
   if (Array.isArray(content)) return content.some(lessonHasContentVideo);
@@ -35,6 +40,7 @@ const lessonShape = (
     video_watched: false,
     pdf_viewed: false,
     questions_completed: false,
+    manual_completed: false,
   };
   const count = [p.video_watched, p.pdf_viewed, p.questions_completed].filter(Boolean).length;
   const total = [lesson.video_id || lessonHasContentVideo(lesson.content), lesson.pdf_path || lesson.word_path || lessonHasContentDocument(lesson.content), (lesson.questions as unknown[] | undefined)?.length].filter(Boolean).length;
@@ -42,8 +48,8 @@ const lessonShape = (
     ...lesson,
     duration: "Lesson",
     progress: p,
-    progressPercent: Math.round((count / Math.max(total, 1)) * 100),
-    status: total > 0 && count >= total ? "completed" : count ? "in_progress" : "not_started",
+    progressPercent: p.manual_completed ? 100 : Math.round((count / Math.max(total, 1)) * 100),
+    status: p.manual_completed || (total > 0 && count >= total) ? "completed" : count ? "in_progress" : "not_started",
   };
 };
 const lessonReferencesImage = (content: unknown, imagePath: string) => {
@@ -170,6 +176,35 @@ Deno.serve(async (req) => {
 
     if (path.startsWith("/admin/")) {
       await requireAdmin(req);
+      if (path === "/admin/forensics/resolve" && req.method === "POST") {
+        const { watermark_code } = await req.json();
+        if (typeof watermark_code !== "string" || watermark_code.length > 80) return fail("Enter a valid watermark code.");
+        const normalizedCode = watermark_code.trim().toUpperCase().replace(/\s+/g, "");
+        const isFullCode = /^W-[0-9A-F?]{12}-[0-9A-F?]{10}$/.test(normalizedCode);
+        if (!isFullCode && !/^[W0-9A-F?*-]+$/.test(normalizedCode)) {
+          return fail("Enter a full watermark code or a fragment containing only its visible characters, ? for one unreadable character, and * for an unknown-length gap.");
+        }
+        const readableCharacters = normalizedCode.replace(/[^0-9A-F]/g, "").length;
+        if (readableCharacters < 8) return fail("Enter at least 8 readable hexadecimal characters; use ? for unreadable characters.");
+        const selectedFields = "watermark_code,integrity_tag,student_id,lesson_id,session_hash,issued_at,watermark_version";
+        const hasWildcards = normalizedCode.includes("?") || normalizedCode.includes("*");
+        const pattern = normalizedCode.replaceAll("?", "_").replaceAll("*", "%");
+        const queryPattern = isFullCode ? pattern : `%${pattern}%`;
+        const { data: matches, error } = isFullCode && !hasWildcards
+          ? await db.from("forensic_watermarks").select(selectedFields).eq("watermark_code", normalizedCode).limit(2)
+          : await db.from("forensic_watermarks").select(selectedFields).ilike("watermark_code", queryPattern).limit(2);
+        if (error) throw error;
+        if (!matches?.length) return json({ detected: false, reason: "NO_MATCHING_RECORD", classification: "INCONCLUSIVE", integrity: "UNKNOWN", confidence: 0, extraction_quality: "LOW" });
+        if (matches.length > 1) return json({ detected: false, reason: "AMBIGUOUS_PARTIAL_CODE", classification: "INCONCLUSIVE", integrity: "UNKNOWN", confidence: 0, extraction_quality: "LOW" });
+        const record = matches[0];
+        const canonicalIssuedAt = new Date(record.issued_at).toISOString();
+        const expected = await hmacHex(Deno.env.get("FORENSIC_WATERMARK_SECRET") ?? "", `${record.watermark_code.split("-").slice(0, 2).join("-")}|${record.student_id}|${record.lesson_id}|${record.session_hash}|${canonicalIssuedAt}`);
+        const valid = Boolean(Deno.env.get("FORENSIC_WATERMARK_SECRET")) && expected === record.integrity_tag && record.watermark_code.endsWith(expected.slice(0, 10).toUpperCase());
+        if (!valid) return json({ detected: true, watermark_id: record.watermark_code, classification: "INCONCLUSIVE", integrity: "INVALID", confidence: 20, extraction_quality: "LOW" });
+        const { data: learner, error: learnerError } = await db.from("students").select("id,name").eq("id", record.student_id).maybeSingle();
+        if (learnerError) throw learnerError;
+        return json({ detected: true, watermark_id: record.watermark_code, content_id: record.lesson_id, session_id: record.session_hash.slice(0, 12), student_id: learner?.id ?? record.student_id, student_name: learner?.name ?? "Unknown learner", timestamp: record.issued_at, classification: "CONFIRMED", integrity: "VALID", confidence: 100, extraction_quality: "HIGH", requires_human_review: true });
+      }
       if (path === "/admin/video-upload-credentials" && req.method === "POST") {
         const { title } = await req.json();
         if (!title || typeof title !== "string")
@@ -498,6 +533,33 @@ Deno.serve(async (req) => {
     }
 
     const student = await requireStudent(req);
+    const watermark = path.match(/^\/lessons\/([0-9a-f-]+)\/watermark$/);
+    if (watermark && req.method === "POST") {
+      const { data: lesson, error } = await db.from("lessons").select("id").eq("id", watermark[1]).eq("published", true).maybeSingle();
+      if (error) throw error;
+      if (!lesson) return fail("Lesson not found.", 404);
+      const secret = Deno.env.get("FORENSIC_WATERMARK_SECRET");
+      if (!secret) return fail("Forensic watermarking is not configured.", 503);
+      const randomId = hex(crypto.getRandomValues(new Uint8Array(6))).toUpperCase();
+      const sessionHash = await sha256(readCookie(req, "lp_session") ?? "");
+      const issuedAt = new Date().toISOString();
+      const integrityTag = await hmacHex(secret, `W-${randomId}|${student.id}|${lesson.id}|${sessionHash}|${issuedAt}`);
+      const watermarkCode = `W-${randomId}-${integrityTag.slice(0, 10).toUpperCase()}`;
+      const { error: insertError } = await db.from("forensic_watermarks").insert({ watermark_code: watermarkCode, integrity_tag: integrityTag, student_id: student.id, lesson_id: lesson.id, session_hash: sessionHash, issued_at: issuedAt });
+      if (insertError) throw insertError;
+      return json({ watermark_code: watermarkCode });
+    }
+    if (path === "/capture-events" && req.method === "POST") {
+      const body = await req.json();
+      const allowed = new Set(["SCREEN_SHARING_DETECTED", "SCREEN_SHARING_ENDED", "UNKNOWN_CAPTURE_SUSPICION", "SCREENSHOT_SHORTCUT_OBSERVED"]);
+      if (!allowed.has(body.capture_type) || typeof body.lesson_id !== "string") return fail("Invalid capture event.");
+      const { data: lesson, error: lessonError } = await db.from("lessons").select("id").eq("id", body.lesson_id).eq("published", true).maybeSingle();
+      if (lessonError) throw lessonError;
+      if (!lesson) return fail("Lesson not found.", 404);
+      const { error } = await db.from("capture_events").insert({ student_id: student.id, lesson_id: lesson.id, platform: "web", capture_type: body.capture_type, capture_state: String(body.capture_state ?? "UNKNOWN").slice(0, 40), response: String(body.response ?? "NONE").slice(0, 80) });
+      if (error) throw error;
+      return json({ ok: true }, 201);
+    }
     if (path === "/lessons" && req.method === "GET") {
       const [{ data: lessons, error }, { data: progress }] = await Promise.all([
         db.from("lessons").select("*,questions(id,question_text,question_type,options)").eq("published", true).order("order_index"),
@@ -588,19 +650,6 @@ Deno.serve(async (req) => {
       if (signError) throw signError;
       return json({ url: signed.signedUrl, expires_in: 300 });
     }
-    if (path === "/progress" && req.method === "POST") {
-      const { lesson_id, field } = await req.json();
-      if (!["video_watched", "pdf_viewed"].includes(field))
-        return fail("Invalid progress field.");
-      const { error } = await db
-        .from("progress")
-        .upsert(
-          { student_id: student.id, lesson_id, [field]: true },
-          { onConflict: "student_id,lesson_id" },
-        );
-      if (error) throw error;
-      return json({ ok: true });
-    }
     if (path === "/submit-answers" && req.method === "POST") {
       const { lesson_id, answers } = await req.json();
       if (!Array.isArray(answers) || answers.length === 0)
@@ -624,12 +673,6 @@ Deno.serve(async (req) => {
         { onConflict: "student_id,question_id" },
       );
       if (error) throw error;
-      await db
-        .from("progress")
-        .upsert(
-          { student_id: student.id, lesson_id, questions_completed: true },
-          { onConflict: "student_id,lesson_id" },
-        );
       const correctCount = (valid ?? []).filter((question) => {
         if (question.question_type !== "multiple_choice" || !question.correct_answer) return false;
         const answer = answers.find((item: { question_id: string }) => item.question_id === question.id);
@@ -662,7 +705,7 @@ Deno.serve(async (req) => {
       ));
       const token = Array.from(embedToken, (byte) => byte.toString(16).padStart(2, "0")).join("");
       const url = `https://iframe.mediadelivery.net/embed/${encodeURIComponent(library)}/${encodeURIComponent(videoId)}?token=${token}&expires=${expires}`;
-      return json({ url, expires_in: 720, student_name: student.name, student_code: student.codes?.code ?? "" });
+      return json({ url, expires_in: 720 });
     }
     return fail("Route not found.", 404);
   } catch (error) {

@@ -7,6 +7,13 @@ export const isDemoMode = !base;
 const SESSION = "lesson_portal_session_hint";
 const progressKey = "lesson_portal_demo_progress";
 export type StudentAnswer = { id: string; student_id: string; student_name: string; question_id: string; question_text: string; question_type: "text" | "multiple_choice"; answer_text: string; submitted_at: string };
+export type ForensicLookupResult = {
+  detected: boolean; watermark_id?: string; content_id?: string; session_id?: string; student_id?: string; student_name?: string; timestamp?: string;
+  reason?: "NO_MATCHING_RECORD" | "AMBIGUOUS_PARTIAL_CODE" | "DEMO_MODE";
+  classification: "CONFIRMED" | "PROBABLE" | "INCONCLUSIVE" | "NOT_DETECTED";
+  integrity: "VALID" | "INVALID" | "UNKNOWN"; confidence: number; extraction_quality: "HIGH" | "MEDIUM" | "LOW";
+  requires_human_review?: boolean;
+};
 const lessonHasDocument = (lesson: Lesson) => Boolean(lesson.pdf_path || lesson.word_path || [
   ...(lesson.content?.blocks ?? []),
   ...(lesson.content?.sections ?? []).flatMap((section) => section.blocks),
@@ -37,7 +44,11 @@ function loadLessons() {
   const savedLessons = JSON.parse(localStorage.getItem("lesson_portal_demo_lessons") || "[]") as Lesson[];
   const source = [...demoLessons.map((lesson) => savedLessons.find((saved) => saved.id === lesson.id) ?? lesson), ...savedLessons.filter((saved) => !demoLessons.some((lesson) => lesson.id === saved.id))];
   return source.map((lesson) => {
-    const progress = stored[lesson.id] || lesson.progress;
+    const progress = Object.assign(
+      { video_watched: false, pdf_viewed: false, questions_completed: false, manual_completed: false },
+      lesson.progress,
+      stored[lesson.id],
+    );
     const count = [
       progress.video_watched,
       progress.pdf_viewed,
@@ -46,17 +57,10 @@ function loadLessons() {
     return {
       ...lesson,
       progress,
-      progressPercent: Math.round((count / Math.max(1, [lesson.video_id, lessonHasDocument(lesson), lesson.questions?.length].filter(Boolean).length)) * 100),
-      status: count > 0 && count >= [lesson.video_id, lessonHasDocument(lesson), lesson.questions?.length].filter(Boolean).length ? "completed" : count ? "in_progress" : "not_started",
+      progressPercent: progress.manual_completed ? 100 : Math.round((count / Math.max(1, [lesson.video_id, lessonHasDocument(lesson), lesson.questions?.length].filter(Boolean).length)) * 100),
+      status: progress.manual_completed || (count > 0 && count >= [lesson.video_id, lessonHasDocument(lesson), lesson.questions?.length].filter(Boolean).length) ? "completed" : count ? "in_progress" : "not_started",
     } as Lesson;
   });
-}
-function saveProgress(id: string, patch: Partial<Lesson["progress"]>) {
-  const all = Object.fromEntries(
-    loadLessons().map((lesson) => [lesson.id, lesson.progress]),
-  );
-  all[id] = { ...all[id], ...patch };
-  localStorage.setItem(progressKey, JSON.stringify(all));
 }
 const delay = (ms = 280) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -107,7 +111,7 @@ export const api = {
   async getVideoToken(
     id: string,
     videoId?: string,
-  ): Promise<{ url: string; expires_in: number; student_name: string; student_code: string } | null> {
+  ): Promise<{ url: string; expires_in: number } | null> {
     if (isDemoMode) return null;
     return request(`/lessons/${id}/video-url`, { method: "POST", body: JSON.stringify({ video_id: videoId }) });
   },
@@ -123,6 +127,26 @@ export const api = {
     if (isDemoMode) return null;
     const params = new URLSearchParams({ path });
     return request<{ url: string; expires_in: number }>(`/lessons/${id}/document?${params.toString()}`);
+  },
+  async getForensicWatermark(id: string): Promise<{ watermark_code: string } | null> {
+    if (isDemoMode) {
+      let code = sessionStorage.getItem(`lesson_portal_watermark_${id}`);
+      if (!code) {
+        const random = crypto.getRandomValues(new Uint8Array(5));
+        code = `DEMO-W-${Array.from(random, (byte) => byte.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+        sessionStorage.setItem(`lesson_portal_watermark_${id}`, code);
+      }
+      return { watermark_code: code };
+    }
+    return request(`/lessons/${id}/watermark`, { method: "POST" });
+  },
+  async logCaptureEvent(event: { lesson_id: string; capture_type: string; capture_state: string; response: string }) {
+    if (isDemoMode) return;
+    return request("/capture-events", { method: "POST", body: JSON.stringify(event) });
+  },
+  async adminResolveWatermark(watermark_code: string): Promise<ForensicLookupResult> {
+    if (isDemoMode) return { detected: false, reason: "DEMO_MODE", classification: "INCONCLUSIVE", integrity: "UNKNOWN", confidence: 0, extraction_quality: "LOW" };
+    return request<ForensicLookupResult>("/admin/forensics/resolve", { method: "POST", body: JSON.stringify({ watermark_code }) });
   },
   async adminVideoUrl(id: string, videoId?: string) {
     if (isDemoMode) return null;
@@ -140,20 +164,9 @@ export const api = {
     if (isDemoMode) return null;
     return request<{ url: string; expires_in: number }>(`/admin/lessons/${id}/document-url`, { method: "POST", body: JSON.stringify({ path }) });
   },
-  async markProgress(id: string, field: keyof Lesson["progress"]) {
-    if (isDemoMode) {
-      saveProgress(id, { [field]: true });
-      return;
-    }
-    return request("/progress", {
-      method: "POST",
-      body: JSON.stringify({ lesson_id: id, field }),
-    });
-  },
   async submitAnswers(id: string, answers: Record<string, string>) {
     if (isDemoMode) {
       await delay();
-      saveProgress(id, { questions_completed: true });
       const lesson = loadLessons().find((item) => item.id === id);
       const studentName = localStorage.getItem("lesson_portal_student_name") || "Demo student";
       const saved = JSON.parse(localStorage.getItem("lesson_portal_demo_answers") || "[]") as StudentAnswer[];
@@ -359,6 +372,7 @@ export const api = {
           video_watched: false,
           pdf_viewed: false,
           questions_completed: false,
+          manual_completed: false,
         },
         questions: [],
       };

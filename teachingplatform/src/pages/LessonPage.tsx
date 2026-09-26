@@ -1,6 +1,6 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, BookOpen, CheckCircle, ClipboardText, FilePdf, VideoCamera } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, BookOpen, CheckCircle, ClipboardText, FilePdf, List, VideoCamera, X } from "@phosphor-icons/react";
 import { api } from "../lib/api";
 import type { Lesson } from "../types";
 import { Shell, ThemeToggle } from "../context/LocaleContext";
@@ -126,6 +126,8 @@ export function LessonPage() {
   const [tab, setTab] = useState<"content" | "quiz">("content");
   const [activeLessonTab, setActiveLessonTab] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSectionsOpen, setMobileSectionsOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => window.matchMedia("(max-width: 820px)").matches);
   const [activeVideoBlockId, setActiveVideoBlockId] = useState("");
   const [sent, setSent] = useState(false);
   const [quizResult, setQuizResult] = useState<{ correct_count: number; graded_count: number; written_count: number } | null>(
@@ -149,6 +151,13 @@ export function LessonPage() {
       .catch(() => navigate("/dashboard"));
   }, [id, navigate]);
 
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 820px)");
+    const updateViewport = () => setIsMobileViewport(media.matches);
+    media.addEventListener("change", updateViewport);
+    return () => media.removeEventListener("change", updateViewport);
+  }, []);
+
   if (!lesson) {
     return (
       <Shell>
@@ -165,6 +174,7 @@ export function LessonPage() {
   const activeVideoPart = videoParts.find((block) => block.id === activeVideoBlockId) ?? videoParts[0];
   const showQuizTab = Boolean(lesson.content?.quizEnabled || lesson.questions.length);
   const showTabsNav = lessonTabs.length > 0 || showQuizTab;
+  const activeSectionTitle = tab === "quiz" ? lesson.content?.quizTitle || tx("Quiz", "اختبار") : authoredTab?.title || tx("Lesson content", "محتوى الدرس");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -230,10 +240,24 @@ export function LessonPage() {
 
         <div className={`lesson-player-workspace${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
           {showTabsNav && (
-            <aside className="admin-sidebar lesson-section-sidebar" aria-label={tx("Lesson sections", "أقسام الدرس")}>
+            <>
+              <button
+                type="button"
+                className="lesson-mobile-sections-trigger"
+                aria-expanded={mobileSectionsOpen}
+                aria-controls="student-lesson-sections"
+                onClick={() => setMobileSectionsOpen((open) => !open)}
+              >
+                <List aria-hidden="true" />
+                <span>{activeSectionTitle}</span>
+                <ArrowRight aria-hidden="true" />
+              </button>
+              {mobileSectionsOpen && <button type="button" className="lesson-mobile-drawer-backdrop" aria-label={tx("Close lesson sections", "إغلاق أقسام الدرس")} onClick={() => setMobileSectionsOpen(false)} />}
+            <aside id="student-lesson-sections" className={`admin-sidebar lesson-section-sidebar${mobileSectionsOpen ? " mobile-open" : ""}`} aria-label={tx("Lesson sections", "أقسام الدرس")} aria-hidden={isMobileViewport && !mobileSectionsOpen} inert={isMobileViewport && !mobileSectionsOpen}>
               <div>
                 <div className="lesson-sidebar-heading">
                   <p>{tx("LESSON CONTENT", "محتوى الدرس")}</p>
+                  <button type="button" className="lesson-mobile-drawer-close" aria-label={tx("Close lesson sections", "إغلاق أقسام الدرس")} onClick={() => setMobileSectionsOpen(false)}><X aria-hidden="true" /></button>
                   <button
                     type="button"
                     className="lesson-sidebar-toggle"
@@ -259,6 +283,7 @@ export function LessonPage() {
                       onClick={() => {
                         setActiveLessonTab(item.id);
                         setTab("content");
+                        setMobileSectionsOpen(false);
                       }}
                     >
                       <SectionIcon aria-hidden="true" />
@@ -271,13 +296,14 @@ export function LessonPage() {
                     type="button"
                     aria-current={tab === "quiz" ? "page" : undefined}
                     className={tab === "quiz" ? "active" : ""}
-                    onClick={() => setTab("quiz")}
+                    onClick={() => { setTab("quiz"); setMobileSectionsOpen(false); }}
                   >
                     <ClipboardText aria-hidden="true" /> <span>{lesson.content?.quizTitle || tx("Quiz", "اختبار")}</span>
                   </button>
                 )}
               </div>
             </aside>
+            </>
           )}
 
           <div className="lesson-player-main">

@@ -1,7 +1,7 @@
 import type { Lesson, LessonBlock } from "../../types";
 import { useState } from "react";
 import { ArrowDown, ArrowUp } from "@phosphor-icons/react";
-import { useLocale } from "../../context/LocaleContext";
+import { useLocale } from "../../context/LocaleState";
 
 export function BlockInspector({ block, onChange, uploadVideo, uploadPdf, uploadImage, busy, uploading, lesson, onMoveVideoPart, canMoveVideoPartUp, canMoveVideoPartDown, videoPartNumber }: {
   block: LessonBlock;

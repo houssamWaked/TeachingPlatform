@@ -1,6 +1,6 @@
 import { FileDoc, FilePdf, Image, LinkSimple, Plus, TextAa, VideoCamera } from "@phosphor-icons/react";
 import type { LessonBlockType } from "../../types";
-import { useLocale } from "../../context/LocaleContext";
+import { useLocale } from "../../context/LocaleState";
 
 const components = [
   { type: "heading", label: "Heading", arabic: "عنوان", icon: TextAa }, { type: "text", label: "Text", arabic: "نص", icon: TextAa },

@@ -367,9 +367,13 @@ Deno.serve(async (req) => {
       }
       if (path === "/admin/lessons" && req.method === "POST") {
         const body = await req.json();
-        const { count } = await db
+        const { data: lastLesson, error: orderError } = await db
           .from("lessons")
-          .select("*", { head: true, count: "exact" });
+          .select("order_index")
+          .order("order_index", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (orderError) throw orderError;
         const { data, error } = await db
           .from("lessons")
           .insert({
@@ -380,7 +384,7 @@ Deno.serve(async (req) => {
             word_path: "",
             content: { blocks: [], sections: [] },
             published: false,
-            order_index: (count ?? 0) + 1,
+            order_index: (lastLesson?.order_index ?? 0) + 1,
           })
           .select("*,questions(*)")
           .single();

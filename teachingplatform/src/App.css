@@ -1298,7 +1298,7 @@ textarea:focus {
 .table-row {
   min-width: 760px;
   display: grid;
-  grid-template-columns: 1.35fr 0.8fr 1fr 0.7fr 0.8fr;
+  grid-template-columns: 1.35fr 0.8fr 1fr 0.8fr;
   align-items: center;
   gap: 15px;
   padding: 13px 18px;
@@ -1866,8 +1866,6 @@ button, a, input, textarea, select { transition: color .18s ease, background-col
 .landing-nav .brand, .site-header .brand { font-size: 17px; }
 .landing-actions { display: flex; align-items: center; gap: 25px; }
 .landing-actions > a { font-size: 14px; font-weight: 700; color: var(--accent); }
-.language-toggle { min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.78); color: var(--ink); font-size: 12px; font-weight: 700; }
-.language-toggle:hover { border-color: #a9c1b1; background: #fff; }
 .hero-section { max-width: 1320px; min-height: 620px; grid-template-columns: .9fr 1.1fr; gap: clamp(36px, 7vw, 100px); padding: 68px 28px 82px; }
 .hero-copy { max-width: 590px; }
 .eyebrow { color: #37755c; font-size: 11px; letter-spacing: .17em; }
@@ -2145,7 +2143,6 @@ button[aria-pressed="true"],
   .site-header .brand > span:last-child, .admin-chip { display: none; }
   .header-actions { gap: 10px; }
   .header-actions > a { font-size: 12px; }
-  .language-toggle { min-height: 40px; padding-inline: 9px; }
   .dashboard-head h1, .lesson-heading h1 { font-size: 38px; }
   .lesson-card { grid-template-columns: 92px minmax(0, 1fr); min-height: 188px; }
   .lesson-card-body { padding: 16px 15px 14px; }
@@ -2835,8 +2832,6 @@ body { background: var(--paper); color: var(--ink); }
 .fresh-nav .brand, .fresh-nav .brand-mark { color: white; }
 .fresh-nav .brand-mark { background: rgba(255,255,255,.16); box-shadow: inset 0 0 0 1px rgba(255,255,255,.3); }
 .fresh-nav-note { color: rgba(255,255,255,.76); }
-.fresh-nav .language-toggle { color: white; background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.36); }
-.fresh-nav .language-toggle:hover { background: rgba(255,255,255,.22); }
 .fresh-teacher-link { color: white; background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.36); }
 .fresh-teacher-link:hover { color: white; background: rgba(255,255,255,.24); }
 .fresh-hero { position: relative; isolation: isolate; display: flex; align-items: center; width: 100%; max-width: none; height: 100svh; min-height: 0; padding: 112px clamp(22px, 8vw, 120px) 72px; overflow: hidden; background: #172624; }
@@ -3075,7 +3070,6 @@ body { background: var(--paper); color: var(--ink); }
   .fresh-nav .brand { gap: 6px; font-size: 13px; }
   .fresh-nav .brand-mark { width: 34px; height: 34px; }
   .fresh-nav-actions { gap: 8px; }
-  .fresh-nav .language-toggle { min-height: 44px; padding-inline: 8px; font-size: 11px; }
   .fresh-teacher-link { min-height: 44px; gap: 4px; padding-inline: 9px; font-size: 11px; }
 }
 @media (max-width: 360px) {
@@ -3450,7 +3444,6 @@ a:focus-visible { border-radius: 4px; }
 .fresh-landing .fresh-nav .brand-mark { display: grid; width: auto; height: auto; padding: 0; color: #fff; background: transparent; box-shadow: none; }
 .fresh-landing .fresh-nav .brand-mark svg { font-size: 25px; }
 .fresh-landing .fresh-nav-actions { gap: 12px; }
-.fresh-landing .fresh-nav .language-toggle { display: none; }
 .fresh-landing .fresh-teacher-link { min-height: 40px; padding: 0; border: 0; color: #fff; background: transparent; font-size: 12px; font-weight: 600; }
 .fresh-landing .fresh-teacher-link svg { display: none; }
 .fresh-landing .fresh-hero { position: relative; z-index: 1; display: grid !important; grid-template-columns: minmax(0,1.35fr) minmax(360px,.8fr); align-items: center; gap: clamp(48px,8vw,100px); width: 100%; max-width: none; height: 100svh; min-height: 680px; margin: 0; padding: 82px clamp(38px,3.5vw,42px) 58px; box-sizing: border-box; overflow: hidden; background: transparent; }

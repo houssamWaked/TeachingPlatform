@@ -1,9 +1,11 @@
 ﻿import { useEffect, useState } from "react";
 import { Navigate, NavLink, useNavigate } from "react-router-dom";
-import { ArrowRight, Clock, DeviceMobile, LockKey, MonitorPlay, X } from "@phosphor-icons/react";
+import { ArrowRight, Clock, DeviceMobile, LockKey, X } from "@phosphor-icons/react";
 import { api, isDemoMode } from "../lib/api";
 import type { Lesson } from "../types";
-import { Brand, LanguageToggle, Shell, useLocale } from "../context/LocaleContext";
+import { Brand, Shell, ThemeToggle } from "../context/LocaleContext";
+import { useLocale } from "../context/LocaleState";
+import { useTheme } from "../context/ThemeState";
 import { BackButton } from "../components/ui/BackButton";
 import { useLessonImageUrl } from "../components/lesson-builder/useLessonImageUrl";
 function CodeForm({ compact = false }: { compact?: boolean }) {
@@ -62,7 +64,7 @@ function CodeForm({ compact = false }: { compact?: boolean }) {
           id={compact ? "hero-code" : "access-code"}
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
-          placeholder={compact ? tx("Access code", "رمز الدخول") : tx("e.g. LESSON26", "مثال: LESSON26")}
+          placeholder={compact ? "ACCESS-CODE-HERE" : tx("e.g. LESSON26", "مثال: LESSON26")}
           autoComplete="one-time-code"
         />}
         <button className="primary-button" disabled={loading} aria-busy={loading}>
@@ -70,7 +72,7 @@ function CodeForm({ compact = false }: { compact?: boolean }) {
             <><span className="ui-spinner" aria-hidden="true" /> {tx("Checking…", "جارٍ التحقق…")}</>
           ) : (
             <>
-              {askingName ? tx("Continue", "الدخول إلى الدروس") : compact ? tx("Join Lesson", "الانضمام إلى الدرس") : tx("Continue", "متابعة")} {!compact && <ArrowRight />}
+              {askingName ? tx("Continue", "الدخول إلى الدروس") : compact ? tx("Join Lesson", "الانضمام إلى الدرس") : tx("Continue", "متابعة")} <ArrowRight aria-hidden="true" />
             </>
           )}
         </button>
@@ -99,21 +101,23 @@ export function Landing() {
       <header className="landing-nav fresh-nav">
         <div className="brand"><Brand /></div>
         <div className="fresh-nav-actions">
-          <LanguageToggle />
+          <ThemeToggle />
           <NavLink className="fresh-teacher-link" to="/admin">{tx("Login", "تسجيل الدخول")}</NavLink>
         </div>
       </header>
 
       <section className="hero-section fresh-hero">
         <div className="hero-copy fresh-hero-copy">
+          <p className="eyebrow">{tx("A quiet space to grow", "مساحة هادئة للنمو")}</p>
           <h1>{tx("Welcome to", "مرحباً بك في")}<br />{tx("Lesson Portal", "بوابة الدروس")}</h1>
-          <p className="hero-lede">{tx("Enter your access code to continue your journey. A quiet space designed for focused learning and meaningful progress.", "أدخل رمز الدخول لمتابعة رحلتك التعليمية في مساحة هادئة للتعلم والتركيز والتقدم.")}</p>
+          <p className="hero-lede desktop-helper">{tx("Enter your access code to continue your journey. A quiet space designed for focused learning and meaningful progress.", "أدخل رمز الدخول لمتابعة رحلتك التعليمية في مساحة هادئة للتعلم والتركيز والتقدم.")}</p>
+          <p className="hero-lede mobile-helper">{tx("Enter your access code below to continue.", "أدخل رمز الدخول أدناه للمتابعة.")}</p>
         </div>
         <div className="fresh-hero-visual" aria-hidden="true" />
         <div className="fresh-access-card">
-          <div className="fresh-access-heading"><strong>{tx("Enter Access Code", "أدخل رمز الدخول")}</strong><small>{tx("Type the code provided by your instructor.", "اكتب الرمز الذي أعطاك إياه معلمك.")}</small></div>
+          <div className="fresh-access-heading"><strong>{tx("Enter Access Code", "أدخل رمز الدخول")}</strong><small className="desktop-helper">{tx("Type the code provided by your instructor", "اكتب الرمز الذي أعطاك إياه معلمك")}</small><small className="mobile-helper">{tx("Provided by your instructor", "مقدم من معلمك")}</small></div>
           <CodeForm compact />
-          <div className="fresh-invite-note">{tx("Don't have a code? Ask your teacher for an invite.", "ليس لديك رمز؟ اطلب دعوة من معلمك.")}</div>
+          <div className="fresh-invite-note"><span className="desktop-helper">{tx("Don't have a code? Ask your teacher for an invite.", "ليس لديك رمز؟ اطلب دعوة من معلمك.")}</span><span className="mobile-helper">{tx("Need code? Ask your teacher.", "هل تحتاج إلى رمز؟ اسأل معلمك.")}</span></div>
         </div>
       </section>
 
@@ -126,6 +130,7 @@ export function AccessPage() {
   return (
       <main className="auth-page" id="main-content" tabIndex={-1}>
       <BackButton to="/" label={tx("Back", "رجوع")} ariaLabel={tx("Back to home", "العودة للرئيسية")} />
+      <ThemeToggle className="access-theme-toggle" />
       <div className="auth-card">
         <div className="brand centered"><Brand /></div>
         <div className="auth-copy">
@@ -155,18 +160,21 @@ export function RequireStudent({ children }: { children: React.ReactNode }) {
 }
 function DashboardLessonCard({ lesson, index }: { lesson: Lesson; index: number }) {
   const { tx } = useLocale();
+  const { theme } = useTheme();
   const { url: imageUrl } = useLessonImageUrl(lesson.id, lesson.content?.pageStyle?.cardImage);
+  const dark = theme === "dark";
   return (
     <NavLink className="lesson-card" to={`/lessons/${lesson.id}`}>
       <div className={`lesson-thumb thumb-${(index % 3) + 1}`}>
-        {imageUrl && <img className="lesson-thumb-image" src={imageUrl} alt="" loading="lazy" />}
-        <span>{String(index + 1).padStart(2, "0")}</span>
-        <MonitorPlay weight="duotone" />
+        <picture className="lesson-thumb-picture">
+          {!imageUrl && <source media="(max-width: 760px)" srcSet={dark ? "/figma/dark-student-dashboard-mobile-thumbnail.png" : "/figma/student-dashboard-mobile-lesson-thumbnail-mobile.png"} />}
+          <img className="lesson-thumb-image" src={imageUrl || (dark ? "/figma/dark-student-dashboard-thumbnail.png" : "/figma/student-dashboard-desktop-lesson-thumbnail.png")} alt="" loading="lazy" />
+        </picture>
       </div>
       <div className="lesson-card-body">
         <div className="lesson-meta">
           <span>{tx(`Lesson ${index + 1}`, `الدرس ${index + 1}`)}</span>
-          <span><Clock /> {lesson.duration}</span>
+          <span className="lesson-card-duration"><Clock /> {lesson.duration}</span>
         </div>
         <h3>{lesson.title}</h3>
         <p>{lesson.description}</p>
@@ -193,12 +201,21 @@ export function Dashboard() {
   }, []);
   return (
     <Shell hideHeader>
+      <header className="student-dashboard-nav">
+        <div className="brand"><Brand /></div>
+        <div className="student-dashboard-nav-actions">
+          {studentName && <span className="student-name-pill"><span aria-hidden="true" />{studentName}</span>}
+          <ThemeToggle />
+          <button type="button" onClick={() => { api.signOut(); location.assign("/"); }}>{tx("Exit Portal", "الخروج")}</button>
+        </div>
+      </header>
       <main className="page-container dashboard-page lessons-portal-page" id="main-content" tabIndex={-1}>
         <section className="dashboard-head">
           <div>
             <p className="eyebrow">{tx("STUDENT PORTAL", "بوابة الطالب")}</p>
             <h1>{studentName ? tx(`Welcome, ${studentName}.`, `مرحبًا، ${studentName}.`) : tx("Welcome to your lessons.", "مرحبًا بك في دروسك.")}</h1>
-            <p>{tx("Continue where you left off, or start something new.", "تابع من حيث توقفت أو ابدأ درساً جديداً.")}</p>
+            <p className="desktop-helper">{tx("Continue where you left off, or start something new.", "تابع من حيث توقفت أو ابدأ درساً جديداً.")}</p>
+            <p className="mobile-helper">{tx("Continue your focused learning.", "تابع تعلّمك بتركيز.")}</p>
           </div>
         </section>
         <div className="section-title">

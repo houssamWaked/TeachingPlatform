@@ -1,64 +1,50 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GearSix, GraduationCap, SignOut } from "@phosphor-icons/react";
+import { GearSix, MoonStars, SignOut, Sun } from "@phosphor-icons/react";
 import { api } from "../lib/api";
-type Locale = "en" | "ar";
-const LocaleContext = createContext({
-  locale: "en" as Locale,
-  setLocale: (_locale: Locale) => {},
-  tx: (english: string, _arabic: string) => english,
-});
+import { LocaleContext, useLocale } from "./LocaleState";
+import { ThemeContext, useTheme, type Theme } from "./ThemeState";
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setTheme] = useState<Theme>(() => localStorage.getItem("lesson_portal_theme") === "dark" ? "dark" : "light");
+  useEffect(() => {
+    localStorage.setItem("lesson_portal_theme", theme);
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+  }, [theme]);
+  const toggleTheme = useCallback(() => setTheme((current) => current === "dark" ? "light" : "dark"), []);
+  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
+}
+
+export function ThemeToggle({ className = "" }: { className?: string }) {
+  const { theme, toggleTheme } = useTheme();
+  const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+  return <button type="button" className={`theme-toggle ${className}`.trim()} aria-label={label} title={label} aria-pressed={theme === "dark"} onClick={toggleTheme}>{theme === "dark" ? <Sun aria-hidden="true" /> : <MoonStars aria-hidden="true" />}</button>;
+}
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocale] = useState<Locale>(() => {
-    const saved = localStorage.getItem("lesson_portal_locale");
-    return saved === "ar" || saved === "en"
-      ? saved
-      : navigator.language.startsWith("ar")
-        ? "ar"
-        : "en";
-  });
   useEffect(() => {
-    localStorage.setItem("lesson_portal_locale", locale);
-    document.documentElement.lang = locale;
-    document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
-  }, [locale]);
-  const tx = useCallback(
-    (english: string, arabic: string) => (locale === "ar" ? arabic : english),
-    [locale],
-  );
+    localStorage.removeItem("lesson_portal_locale");
+    document.documentElement.lang = "en";
+    document.documentElement.dir = "ltr";
+  }, []);
+  const tx = useCallback((english: string, arabic: string) => { void arabic; return english; }, []);
   return (
-    <LocaleContext.Provider value={{ locale, setLocale, tx }}>
+    <LocaleContext.Provider value={{ locale: "en", tx }}>
       {children}
     </LocaleContext.Provider>
   );
 }
-
-export const useLocale = () => useContext(LocaleContext);
 
 export function Brand() {
   const { tx } = useLocale();
   return (
     <>
       <span className="brand-mark">
-        <GraduationCap weight="fill" />
+        <img src="/figma/landing-desktop-book-open.svg" alt="" aria-hidden="true" />
       </span>
       <span>{tx("Lesson Portal", "بوابة الدروس")}</span>
     </>
-  );
-}
-
-export function LanguageToggle() {
-  const { locale, setLocale } = useLocale();
-  return (
-    <button
-      type="button"
-      className="language-toggle"
-      onClick={() => setLocale(locale === "en" ? "ar" : "en")}
-      aria-label={locale === "en" ? "العربية" : "English"}
-    >
-      {locale === "en" ? "العربية" : "English"}
-    </button>
   );
 }
 
@@ -78,7 +64,7 @@ export function Shell({ children, admin = false, hideHeader = false }: { childre
           ) : (
             null
           )}
-          <LanguageToggle />
+          <ThemeToggle />
           <button className="icon-button" aria-label={tx("Sign out", "تسجيل الخروج")} onClick={() => { api.signOut(); navigate("/"); }}>
             <SignOut />
           </button>

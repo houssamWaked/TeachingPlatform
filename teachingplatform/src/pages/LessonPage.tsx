@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, BookOpen, CheckCircle, ClipboardText, FilePdf, VideoCamera } from "@phosphor-icons/react";
 import { api } from "../lib/api";
 import type { Lesson } from "../types";
-import { Shell, useLocale } from "../context/LocaleContext";
+import { Shell, ThemeToggle } from "../context/LocaleContext";
+import { useLocale } from "../context/LocaleState";
 import { SecureVideo } from "../components/SecureVideo";
 import { LessonTabContent } from "../components/LessonTabContent";
 import { installWebCaptureMonitor, subscribeToCaptureEvents } from "../lib/captureProtection";
@@ -162,8 +163,6 @@ export function LessonPage() {
   const authoredTab = lessonTabs.find((item) => item.id === activeLessonTab) ?? lessonTabs[0];
   const { overviewBlocks, videoParts } = resolveVideoParts(authoredTab, lesson);
   const activeVideoPart = videoParts.find((block) => block.id === activeVideoBlockId) ?? videoParts[0];
-  const pageWidth = 850;
-
   const showQuizTab = Boolean(lesson.content?.quizEnabled || lesson.questions.length);
   const showTabsNav = lessonTabs.length > 0 || showQuizTab;
 
@@ -223,7 +222,8 @@ export function LessonPage() {
             <span className="lesson-header-divider" aria-hidden="true" />
             <h1 title={lesson.title}>{lesson.title}</h1>
           </div>
-
+          <ThemeToggle />
+          <button type="button" className="lesson-exit-button" onClick={() => navigate("/dashboard")}>{tx("Exit Portal", "الخروج")}</button>
         </header>
 
 
@@ -281,6 +281,11 @@ export function LessonPage() {
           )}
 
           <div className="lesson-player-main">
+            {lesson.description && (
+              <header className="lesson-player-content-title">
+                <p>{lesson.description}</p>
+              </header>
+            )}
             {videoParts.length > 1 && (
               <nav className="lesson-video-switcher" aria-label={tx("Choose a video", "اختر فيديو")}>
                 {videoParts.map((part, index) => {
@@ -317,7 +322,7 @@ export function LessonPage() {
 
             <div className="lesson-tab-panel">
               {tab === "content" && (lesson.description || overviewBlocks.length > 0) && (
-                <article className="lesson-overview-content" style={{ maxWidth: pageWidth }}>
+                <article className="lesson-overview-content">
                   {lesson.description && <p className="lesson-overview-description">{lesson.description}</p>}
                   {authoredTab && overviewBlocks.length > 0 && (
                     <LessonTabContent

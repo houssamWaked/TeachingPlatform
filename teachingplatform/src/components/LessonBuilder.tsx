@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Eye, Trash, X } from "@phosphor-icons/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Eye, Plus, Trash } from "@phosphor-icons/react";
 import type { Lesson, LessonBlock, LessonBlockType, LessonContent, Question } from "../types";
 import { api } from "../lib/api";
 import { BlockInspector } from "./lesson-builder/BlockInspector";
@@ -8,7 +8,9 @@ import { LessonBlockRenderer } from "./lesson-builder/LessonBlockRenderer";
 import { LessonTabContent } from "./LessonTabContent";
 import { QuizEditor } from "./lesson-builder/QuizEditor";
 import { contentWithTabs } from "../lib/lessonTabs";
-import { useLocale } from "../context/LocaleContext";
+import { ThemeToggle } from "../context/LocaleContext";
+import { useLocale } from "../context/LocaleState";
+import { useTheme } from "../context/ThemeState";
 
 const makeId = () => crypto.randomUUID();
 const emptyContent = (): LessonContent => ({ blocks: [], sections: [] });
@@ -28,9 +30,16 @@ function LessonTabsPreview({ tabs, lesson, video, content, tx }: { tabs: NonNull
 
 export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { lesson: Lesson; onClose: () => void; onSaved: (lesson: Lesson) => void; video: (lessonId: string, videoId?: string) => React.ReactNode }) {
   const { tx } = useLocale();
+  const { theme } = useTheme();
   const [lesson, setLesson] = useState<Lesson>(() => ({ ...initial, content: contentWithTabs(initial) }));
+  const initialSnapshot = JSON.stringify(lesson);
+  const lastSavedSnapshot = useRef(initialSnapshot);
+  const lastAutosaveAttempt = useRef(initialSnapshot);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [selected, setSelected] = useState("");
   const [preview, setPreview] = useState(false);
+  const [mobileComponentsOpen, setMobileComponentsOpen] = useState(false);
+  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [uploadingCardImage, setUploadingCardImage] = useState(false);
   const [uploading, setUploading] = useState<{ type: "video" | "document"; blockId: string } | null>(null);
@@ -45,9 +54,9 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
   const selectedLocation = selected.split(":")[0];
   const selectedVideoBlocks = (selectedLocation.startsWith("tab_") ? content.tabs?.find((tab) => `tab_${tab.id}` === selectedLocation)?.blocks : selectedLocation === "root" ? content.blocks : content.sections.find((section) => section.id === selectedLocation)?.blocks)?.filter((block) => block.type === "video") ?? [];
   const selectedVideoIndex = selectedVideoBlocks.findIndex((block) => block.id === selectedBlock?.id);
-  const update = (patch: Partial<Lesson>) => setLesson((current) => ({ ...current, ...patch }));
+  const update = useCallback((patch: Partial<Lesson>) => setLesson((current) => ({ ...current, ...patch })), []);
   const setContent = (next: LessonContent) => update({ content: next });
-  async function save(patch: Partial<Lesson> = {}) {
+  const save = useCallback(async (patch: Partial<Lesson> = {}) => {
     setBusy(true); setNotice("");
     try {
       const next = { ...lesson, ...patch };
@@ -55,12 +64,25 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
       const saved = (result ?? next) as Lesson;
       // Apply the lesson response before saving quiz answers. A quiz-save
       // failure must not leave a newly uploaded media block looking empty.
-      update(saved); onSaved(saved);
+      lastSavedSnapshot.current = JSON.stringify({ ...saved, questions: next.questions });
+      update({ ...saved, questions: next.questions }); onSaved({ ...saved, questions: next.questions });
       const questions = await api.saveQuestions(lesson.id, next.questions);
-      update({ ...saved, questions }); onSaved({ ...saved, questions }); setNotice(tx("All changes saved", "تم حفظ كل التغييرات")); return { ...saved, questions };
+      const savedWithQuestions = { ...saved, questions };
+      lastSavedSnapshot.current = JSON.stringify(savedWithQuestions);
+      update(savedWithQuestions); onSaved(savedWithQuestions); setNotice(tx("All changes saved", "تم حفظ كل التغييرات")); return savedWithQuestions;
     } catch (error) { setNotice(error instanceof Error ? error.message : tx("Could not save changes.", "تعذر حفظ التغييرات.")); return null; }
     finally { setBusy(false); }
-  }
+  }, [lesson, onSaved, tx, update]);
+  useEffect(() => {
+    if (!autoSaveEnabled || busy) return;
+    const snapshot = JSON.stringify(lesson);
+    if (snapshot === lastSavedSnapshot.current || snapshot === lastAutosaveAttempt.current) return;
+    const timeout = window.setTimeout(() => {
+      lastAutosaveAttempt.current = snapshot;
+      void save();
+    }, 800);
+    return () => window.clearTimeout(timeout);
+  }, [autoSaveEnabled, busy, lesson, save]);
   function createBlock(type: LessonBlockType): LessonBlock { return { id: makeId(), type, text: type === "heading" ? tx("New heading", "عنوان جديد") : "", title: type === "embed" ? tx("Add a title", "أضف عنواناً") : "", url: "", mediaEmpty: ["video", "pdf", "word"].includes(type) }; }
   function tabPlacementError(type: LessonBlockType, sectionId: string, exceptId?: string) {
     if (!sectionId.startsWith("tab_")) return "";
@@ -207,9 +229,13 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
   }
   function editableBlock(block: LessonBlock, sectionId: string, index: number) {
     const id = `${sectionId}:${block.id}`;
-    return <div key={block.id} className={`canvas-component ${selected === id ? "is-selected" : ""}`} draggable onDragStart={(event) => startBlockDrag(event, block.id, sectionId)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropOn(event, sectionId, index)} onClick={(event) => { event.stopPropagation(); setSelected(id); }}>
+    return <div key={block.id} data-component-type={block.type} className={`canvas-component ${selected === id ? "is-selected" : ""}`} draggable onDragStart={(event) => startBlockDrag(event, block.id, sectionId)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropOn(event, sectionId, index)} onClick={(event) => { event.stopPropagation(); setSelected(id); }}>
       <span className="canvas-drag-handle" aria-hidden="true">⠿</span>
-      <LessonBlockRenderer block={block} lesson={lesson} video={video} admin />
+      {block.type === "video" ? <div className="builder-video-preview">
+        <LessonBlockRenderer block={block} lesson={lesson} video={video} admin />
+        <div className="builder-video-preview-meta"><span>{tx("Embed", "تضمين")}: {block.attachmentName?.replace(/\.[^.]+$/, "") || block.title || tx("Video lesson", "درس فيديو")}</span><span>{lesson.duration || ""}</span></div>
+        {block.mediaEmpty && <div className="builder-video-preview-play" aria-hidden="true"><picture><source media="(max-width: 820px)" srcSet={theme === "dark" ? "/figma/dark-lesson-builder-mobile-play.svg" : "/figma/lesson-builder-mobile-play.svg"} /><img src={theme === "dark" ? "/figma/dark-lesson-builder-desktop-play.svg" : "/figma/lesson-builder-desktop-play.svg"} alt="" /></picture></div>}
+      </div> : <LessonBlockRenderer block={block} lesson={lesson} video={video} admin />}
     </div>;
   }
   function insertMarker(sectionId: string, index: number) { return <div key={`drop-${sectionId}-${index}`} className="canvas-drop-marker" onDragOver={(event) => { event.preventDefault(); event.currentTarget.classList.add("is-over"); }} onDragLeave={(event) => event.currentTarget.classList.remove("is-over")} onDrop={(event) => dropOn(event, sectionId, index)}><span>{tx("Drop component here", "أفلت المكوّن هنا")}</span></div>; }
@@ -246,24 +272,26 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
   return (
     <div className="builder-backdrop">
       <section className="lesson-builder live-builder">
+        <div className="builder-mobile-status-bar" aria-hidden="true"><span>9:41</span><span className="builder-mobile-status-icons"><img src={theme === "dark" ? "/figma/dark-lesson-builder-mobile-ios-signal.svg" : "/figma/lesson-builder-mobile-ios-signal.svg"} alt="" /><img src={theme === "dark" ? "/figma/dark-lesson-builder-mobile-ios-wifi-signal.svg" : "/figma/lesson-builder-mobile-ios-wifi-signal.svg"} alt="" /><img src={theme === "dark" ? "/figma/dark-lesson-builder-mobile-ios-battery-full.svg" : "/figma/lesson-builder-mobile-ios-battery-full.svg"} alt="" /></span></div>
         <header className="builder-top">
-          <div><small>{tx("LESSON BUILDER", "محرر الدرس")} · {lesson.published ? tx("PUBLISHED", "منشور") : tx("DRAFT", "مسودة")}</small><h2>{lesson.title || tx("Untitled lesson", "درس بلا عنوان")}</h2></div>
+          <div><small><span className="builder-desktop-status-prefix">{tx("LESSON BUILDER", "محرر الدرس")} · </span>{lesson.published ? tx("PUBLISHED", "منشور") : tx("DRAFT", "مسودة")}</small><h2>{lesson.title || tx("Untitled lesson", "درس بلا عنوان")}</h2></div>
           <div>
             <span className="save-status" aria-live="polite">{notice}</span>
-            <button className="secondary-button" onClick={() => setPreview(true)}><Eye /> {tx("Student preview", "معاينة الطالب")}</button>
-            <button className="secondary-button" disabled={busy} aria-busy={busy} onClick={() => void save()}>{busy && <span className="ui-spinner" aria-hidden="true" />}{tx("Save", "حفظ")}</button>
-            <button className="primary-button" disabled={busy || !lesson.title.trim()} aria-busy={busy} onClick={() => void save({ published: !lesson.published })}>{busy && <span className="ui-spinner" aria-hidden="true" />}{lesson.published ? tx("Unpublish", "إلغاء النشر") : tx("Publish", "نشر")}</button>
-            <button className="icon-button" onClick={onClose} aria-label={tx("Close", "إغلاق")}><X /></button>
+            <ThemeToggle className="builder-theme-toggle" />
+            <label className="builder-autosave"><span>{tx("Autosave", "حفظ تلقائي")}</span><input type="checkbox" checked={autoSaveEnabled} onChange={(event) => setAutoSaveEnabled(event.target.checked)} /><span className="builder-autosave-track" aria-hidden="true" /></label>
+            <button className="secondary-button builder-preview-button" onClick={() => setPreview(true)}><Eye /> {tx("Student preview", "معاينة الطالب")}</button>
+            <button className="secondary-button builder-save-button" disabled={busy} aria-busy={busy} onClick={() => void save()}>{busy && <span className="ui-spinner" aria-hidden="true" />}{tx("Save", "حفظ")}</button>
+            <button className="primary-button builder-publish-button" disabled={busy || !lesson.title.trim()} aria-busy={busy} onClick={() => void save({ published: !lesson.published })}>{busy && <span className="ui-spinner" aria-hidden="true" />}{lesson.published ? tx("Unpublish", "إلغاء النشر") : tx("Publish", "نشر")}</button>
+            <button className="icon-button builder-close" onClick={onClose} aria-label={tx("Close", "إغلاق")}><picture><source media="(max-width: 820px)" srcSet="/figma/lesson-builder-mobile-x-circle.svg" /><img src={theme === "dark" ? "/figma/dark-lesson-builder-desktop-x.svg" : "/figma/lesson-builder-desktop-x-circle.svg"} alt="" /></picture></button>
           </div>
         </header>
         <div className="builder-fields">
           <label>{tx("Lesson title", "عنوان الدرس")}<input value={lesson.title} onChange={(event) => update({ title: event.target.value })} /></label>
-          <label>{tx("Short description", "وصف مختصر")}<input value={lesson.description} onChange={(event) => update({ description: event.target.value })} /></label>
-          <label>{tx("Lesson card background image", "صورة خلفية بطاقة الدرس")}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={(event) => { void uploadCardImage(event.target.files?.[0]); event.target.value = ""; }} />
-            {uploadingCardImage && <small className="block-upload-loading" role="status"><span className="ui-spinner" aria-hidden="true" />{tx("Uploading image…", "جارٍ رفع الصورة…")}</small>}
-            {content.pageStyle?.cardImage && <small className="builder-uploaded-filename" title={content.pageStyle.cardImageName || undefined}>{content.pageStyle.cardImageName || tx("Image attached", "تم إرفاق صورة")}</small>}
-            {content.pageStyle?.cardImage && <button type="button" className="secondary-button" onClick={() => setContent({ ...content, pageStyle: { ...content.pageStyle, cardImage: "", cardImageName: "" } })}>{tx("Remove card image", "إزالة صورة البطاقة")}</button>}
-          </label>
+          <label>{tx("Short description", "وصف مختصر")}<input placeholder={tx("Add description…", "أضف وصفاً…")} value={lesson.description} onChange={(event) => update({ description: event.target.value })} /></label>
+          <div className="builder-card-image-field">
+            <label className="builder-card-image-picker" htmlFor="builder-card-image-input"><picture><source media="(max-width: 820px)" srcSet={theme === "dark" ? "/figma/dark-lesson-builder-mobile-image.svg" : "/figma/lesson-builder-desktop-image.svg"} /><img src={theme === "dark" ? "/figma/dark-lesson-builder-desktop-image.svg" : "/figma/lesson-builder-desktop-image.svg"} alt="" /></picture><span title={content.pageStyle?.cardImageName || undefined}>{uploadingCardImage ? tx("Uploading image…", "جارٍ رفع الصورة…") : content.pageStyle?.cardImageName || tx("Lesson card image…", "صورة بطاقة الدرس…")}</span><input id="builder-card-image-input" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy || uploadingCardImage} onChange={(event) => { void uploadCardImage(event.target.files?.[0]); event.target.value = ""; }} /></label>
+            <button type="button" className="builder-card-image-remove" disabled={!content.pageStyle?.cardImage || busy} onClick={() => setContent({ ...content, pageStyle: { ...content.pageStyle, cardImage: "", cardImageName: "" } })}>{tx("Remove", "إزالة")}</button>
+          </div>
         </div>
         <div className="live-editor-grid">
           <ComponentPalette onAdd={addBlock} onDragStart={startNewDrag} />
@@ -276,14 +304,33 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
                 <button onClick={addTab}>＋ {tx("Add tab", "إضافة علامة تبويب")}</button>
                 {!content.quizEnabled && <button onClick={addQuiz}>＋ {tx("Add quiz tab", "إضافة علامة تبويب اختبار")}</button>}
               </div>
-              {currentTabId === "__quiz__" && <div className="tab-title-edit"><label>{tx("Quiz tab name", "اسم علامة تبويب الاختبار")}<input value={content.quizTitle || tx("Quiz", "اختبار")} onChange={(event) => setContent({ ...content, quizTitle: event.target.value })} /></label><button className="secondary-button" onClick={() => { setContent({ ...content, quizEnabled: false }); setQuestions([]); setActiveTab(content.tabs?.[0]?.id ?? ""); }}>{tx("Remove quiz tab", "إزالة علامة تبويب الاختبار")}</button></div>}
-              {currentTabId === "__quiz__" ? <QuizEditor questions={lesson.questions} onChange={setQuestions} /> : <div className="tab-title-edit"><label>{tx("Tab name", "اسم علامة التبويب")}<input value={content.tabs?.find((tab) => tab.id === currentTabId)?.title ?? ""} onChange={(event) => setContent({ ...content, tabs: (content.tabs ?? []).map((tab) => tab.id === currentTabId ? { ...tab, title: event.target.value } : tab) })} /></label><button className="secondary-button" onClick={removeActiveTab}>{tx("Remove tab", "إزالة علامة التبويب")}</button></div>}
-              {currentTabId !== "__quiz__" && <>{placementError && <p className="form-error tab-placement-error" role="alert">{placementError}</p>}{insertMarker(destination, 0)}{tabBlocks.map((block, index) => <div className="canvas-component-group" key={block.id}>{editableBlock(block, destination, index)}{insertMarker(destination, index + 1)}</div>)}{!tabBlocks.length && <div className="canvas-empty-hint">{tx("Add components to this tab.", "أضف مكوّنات إلى علامة التبويب هذه.")}</div>}</>}
+              <div className="builder-tab-content">
+                {currentTabId === "__quiz__" ? <>
+                  <div className="tab-title-edit"><label>{tx("Quiz tab name", "اسم علامة تبويب الاختبار")}<input value={content.quizTitle || tx("Quiz", "اختبار")} onChange={(event) => setContent({ ...content, quizTitle: event.target.value })} /></label><button className="secondary-button" onClick={() => { setContent({ ...content, quizEnabled: false }); setQuestions([]); setActiveTab(content.tabs?.[0]?.id ?? ""); }}>{tx("Remove quiz tab", "إزالة علامة تبويب الاختبار")}</button></div>
+                  <QuizEditor questions={lesson.questions} onChange={setQuestions} />
+                </> : <>
+                  <div className="tab-title-edit"><label>{tx("Tab name", "اسم علامة التبويب")}<input value={content.tabs?.find((tab) => tab.id === currentTabId)?.title ?? ""} onChange={(event) => setContent({ ...content, tabs: (content.tabs ?? []).map((tab) => tab.id === currentTabId ? { ...tab, title: event.target.value } : tab) })} /></label><button className="secondary-button" onClick={removeActiveTab}>{tx("Remove tab", "إزالة علامة التبويب")}</button></div>
+                  {placementError && <p className="form-error tab-placement-error" role="alert">{placementError}</p>}
+                  <div className="builder-block-list">{insertMarker(destination, 0)}{tabBlocks.map((block, index) => <div className="canvas-component-group" key={block.id}>{editableBlock(block, destination, index)}{insertMarker(destination, index + 1)}</div>)}{!tabBlocks.length && <div className="canvas-empty-hint">{tx("Add components to this tab.", "أضف مكوّنات إلى علامة التبويب هذه.")}</div>}</div>
+                </>}
+              </div>
             </article>
           </main>
-          <aside className="properties-panel">
-            <div className="panel-title"><strong>{selectedBlock ? tx("Block settings", "إعدادات المكوّن") : tx("Lesson settings", "إعدادات الدرس")}</strong>{selectedBlock && <button aria-label={tx("Delete selected item", "حذف العنصر المحدد")} onClick={deleteSelected}><Trash /></button>}</div>
-            {selectedBlock ? <BlockInspector block={selectedBlock} onChange={(patch) => updateBlock(selectedBlock.id, patch)} uploadVideo={uploadVideo} uploadPdf={uploadPdf} uploadImage={uploadImage} busy={busy} uploading={uploading?.blockId === selectedBlock.id ? uploading.type : undefined} lesson={lesson} onMoveVideoPart={(direction) => moveVideoPart(selectedBlock.id, selectedLocation, direction)} canMoveVideoPartUp={selectedVideoIndex > 0} canMoveVideoPartDown={selectedVideoIndex >= 0 && selectedVideoIndex < selectedVideoBlocks.length - 1} videoPartNumber={selectedBlock.type === "video" && selectedVideoIndex >= 0 ? selectedVideoIndex + 1 : undefined} /> : <p>{tx("Select a block to edit its content and appearance.", "اختر مكوّناً لتعديل محتواه ومظهره.")}</p>}
+          <aside className={`properties-panel${mobileSettingsOpen ? "" : " mobile-settings-collapsed"}`}>
+            <div className="panel-title"><strong>{selectedBlock ? tx("Block settings", "إعدادات المكوّن") : tx("Lesson settings", "إعدادات الدرس")}</strong>{!selectedBlock && <p>{tx("Select a block to edit its content and appearance.", "اختر مكوّناً لتعديل محتواه ومظهره.")}</p>}{selectedBlock && <button aria-label={tx("Delete selected item", "حذف العنصر المحدد")} onClick={deleteSelected}><Trash /></button>}</div>
+            <div className="builder-mobile-drawer-handle" aria-hidden="true" />
+            <div className="builder-mobile-drawer-heading"><strong>{tx("Lesson configurations", "إعدادات الدرس")}</strong><button type="button" onClick={() => setMobileSettingsOpen((open) => !open)}>{mobileSettingsOpen ? tx("Hide", "إخفاء") : tx("Show", "إظهار")}</button></div>
+            {mobileSettingsOpen && <>
+              <div className="mobile-builder-settings">
+                <label>{tx("Lesson Title", "عنوان الدرس")}<input value={lesson.title} onChange={(event) => update({ title: event.target.value })} /></label>
+                <label>{tx("Active Tab Name", "اسم علامة التبويب النشطة")}<input value={currentTabId === "__quiz__" ? content.quizTitle ?? tx("Quiz", "اختبار") : content.tabs?.find((tab) => tab.id === currentTabId)?.title ?? ""} onChange={(event) => currentTabId === "__quiz__" ? setContent({ ...content, quizTitle: event.target.value }) : setContent({ ...content, tabs: (content.tabs ?? []).map((tab) => tab.id === currentTabId ? { ...tab, title: event.target.value } : tab) })} /></label>
+              </div>
+              <label className="mobile-card-image-picker" htmlFor="builder-card-image-input-mobile"><img src={theme === "dark" ? "/figma/dark-lesson-builder-mobile-image.svg" : "/figma/lesson-builder-desktop-image.svg"} alt="" /><span>{uploadingCardImage ? tx("Uploading image…", "جارٍ رفع الصورة…") : content.pageStyle?.cardImageName || tx("Upload lesson card image…", "ارفع صورة بطاقة الدرس…")}</span><input id="builder-card-image-input-mobile" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy || uploadingCardImage} onChange={(event) => { void uploadCardImage(event.target.files?.[0]); event.target.value = ""; }} /></label>
+              <button type="button" className="mobile-builder-save" disabled={busy} aria-busy={busy} onClick={() => void save()}>{busy && <span className="ui-spinner" aria-hidden="true" />}{tx("Save Changes", "حفظ التغييرات")}</button>
+              <button className="mobile-builder-add" type="button" aria-expanded={mobileComponentsOpen} onClick={() => setMobileComponentsOpen((open) => !open)}><Plus aria-hidden="true" />{tx("Add content block to tab", "أضف مكوّناً إلى علامة التبويب")}</button>
+              {mobileComponentsOpen && <div className="mobile-builder-palette"><ComponentPalette onAdd={(type) => { addBlock(type); setMobileComponentsOpen(false); }} onDragStart={startNewDrag} /></div>}
+              {selectedBlock ? <BlockInspector block={selectedBlock} onChange={(patch) => updateBlock(selectedBlock.id, patch)} uploadVideo={uploadVideo} uploadPdf={uploadPdf} uploadImage={uploadImage} busy={busy} uploading={uploading?.blockId === selectedBlock.id ? uploading.type : undefined} lesson={lesson} onMoveVideoPart={(direction) => moveVideoPart(selectedBlock.id, selectedLocation, direction)} canMoveVideoPartUp={selectedVideoIndex > 0} canMoveVideoPartDown={selectedVideoIndex >= 0 && selectedVideoIndex < selectedVideoBlocks.length - 1} videoPartNumber={selectedBlock.type === "video" && selectedVideoIndex >= 0 ? selectedVideoIndex + 1 : undefined} /> : <div className="builder-settings-empty"><img src={theme === "dark" ? "/figma/dark-lesson-builder-desktop-settings.svg" : "/figma/lesson-builder-desktop-settings.svg"} alt="" /><p>{tx("No block selected. Click any element inside the workspace to configure.", "لم يتم تحديد مكوّن. انقر فوق أي عنصر في مساحة العمل لتعديله.")}</p></div>}
+            </>}
           </aside>
         </div>
       </section>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LockKey, MonitorPlay, Play } from "@phosphor-icons/react";
 import { api } from "../lib/api";
-import { useLocale } from "../context/LocaleContext";
+import { useLocale } from "../context/LocaleState";
 import { subscribeToCaptureEvents } from "../lib/captureProtection";
 
 type BunnyPlayer = {

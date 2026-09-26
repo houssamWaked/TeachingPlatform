@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import mammoth from "mammoth";
 import DOMPurify from "dompurify";
 import { api } from "../lib/api";
-import { useLocale } from "../context/LocaleContext";
+import { useLocale } from "../context/LocaleState";
 
 export function WordDocumentReader({ lessonId, documentPath, admin = false, onViewed }: { lessonId: string; documentPath?: string; admin?: boolean; onViewed?: () => void }) {
   const { tx } = useLocale();

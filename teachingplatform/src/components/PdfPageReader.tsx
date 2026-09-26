@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { GlobalWorkerOptions, getDocument, type PDFDocumentLoadingTask, type PDFDocumentProxy } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { api } from "../lib/api";
-import { useLocale } from "../context/LocaleContext";
+import { useLocale } from "../context/LocaleState";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 

@@ -1,12 +1,29 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { BookOpen, ClipboardText, DeviceMobile, DownloadSimple, LockKey, MagnifyingGlass, MonitorPlay, Plus, Trash, UserCircle, UsersThree, X } from "@phosphor-icons/react";
+import { BookOpen, ClipboardText, DeviceMobile, DownloadSimple, List, LockKey, MagnifyingGlass, MonitorPlay, Plus, Trash, UserCircle, UsersThree, X } from "@phosphor-icons/react";
 import { api, isDemoMode, type StudentAnswer } from "../lib/api";
 import type { Lesson, Student } from "../types";
-import { Shell, useLocale } from "../context/LocaleContext";
+import { Shell } from "../context/LocaleContext";
+import { useLocale } from "../context/LocaleState";
 import { LessonBuilder } from "../components/LessonBuilder";
+import { useLessonImageUrl } from "../components/lesson-builder/useLessonImageUrl";
 import { SecureVideo } from "../components/SecureVideo";
 import { TeacherAuthUI } from "../components/ui/auth-fuse";
+
+function AdminLessonThumbnail({ lesson }: { lesson: Lesson }) {
+  const imagePath = lesson.content?.pageStyle?.cardImage;
+  const { url } = useLessonImageUrl(lesson.id, imagePath, true);
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => setImageFailed(false), [url]);
+
+  return (
+    <div className={`row-icon${url && !imageFailed ? " has-image" : ""}`} aria-hidden="true">
+      {url && !imageFailed && <img className="row-icon-image" src={url} alt="" loading="lazy" onError={() => setImageFailed(true)} />}
+      <MonitorPlay />
+    </div>
+  );
+}
+
 export function AdminPage() {
   const { tx } = useLocale();
   const navigate = useNavigate();
@@ -18,6 +35,8 @@ export function AdminPage() {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [view, setView] = useState<"lessons" | "codes" | "students" | "answers" | "forensic">(() => lessonId ? "answers" : "lessons");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => window.matchMedia("(max-width: 820px)").matches);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [portalLoading, setPortalLoading] = useState(true);
@@ -48,6 +67,12 @@ export function AdminPage() {
   const [watermarkResult, setWatermarkResult] = useState<Awaited<ReturnType<typeof api.adminResolveWatermark>> | null>(null);
   const [watermarkError, setWatermarkError] = useState("");
   const [watermarkLoading, setWatermarkLoading] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 820px)");
+    const updateViewport = () => setIsMobileViewport(media.matches);
+    media.addEventListener("change", updateViewport);
+    return () => media.removeEventListener("change", updateViewport);
+  }, []);
   useEffect(() => {
     if (!authenticated) return;
     let active = true;
@@ -143,35 +168,52 @@ export function AdminPage() {
   return (
     <Shell admin>
       <main className="admin-layout" id="main-content" tabIndex={-1}>
-        <aside className="admin-sidebar">
-          <div>
+        <button
+          type="button"
+          className="admin-mobile-menu-trigger"
+          aria-expanded={mobileNavOpen}
+          aria-controls="admin-navigation-drawer"
+          onClick={() => setMobileNavOpen(true)}
+        >
+          <List aria-hidden="true" />
+          <span>{tx("Manage", "الإدارة")}</span>
+          <span className="admin-mobile-current-view">{tx(({ lessons: "Lessons", codes: "Access codes", students: "Students", answers: "Student answers", forensic: "Forensic" })[view], ({ lessons: "الدروس", codes: "رموز الدخول", students: "الطلاب", answers: "إجابات الطلاب", forensic: "التحقق الجنائي" })[view])}</span>
+        </button>
+        {mobileNavOpen && <button type="button" className="admin-mobile-drawer-backdrop" aria-label={tx("Close navigation menu", "إغلاق قائمة التنقل")} onClick={() => setMobileNavOpen(false)} />}
+        <aside id="admin-navigation-drawer" className={`admin-sidebar${mobileNavOpen ? " mobile-open" : ""}`} inert={isMobileViewport && !mobileNavOpen}>
+          <div className="admin-sidebar-mobile-head">
+            <span>{tx("MANAGE", "الإدارة")}</span>
+            <button type="button" className="admin-sidebar-mobile-close" aria-label={tx("Close navigation menu", "إغلاق قائمة التنقل")} onClick={() => setMobileNavOpen(false)}><X /></button>
+          </div>
+          <div className="admin-sidebar-nav">
             <p>{tx("MANAGE", "الإدارة")}</p>
             <button
               className={view === "lessons" ? "active" : ""}
-              onClick={() => { setView("lessons"); navigate("/admin"); }}
+              onClick={() => { setView("lessons"); navigate("/admin"); setMobileNavOpen(false); }}
             >
               <BookOpen /> {tx("Lessons", "الدروس")}
             </button>
             <button
               className={view === "codes" ? "active" : ""}
-              onClick={() => { setView("codes"); navigate("/admin"); }}
+              onClick={() => { setView("codes"); navigate("/admin"); setMobileNavOpen(false); }}
             >
               <LockKey /> {tx("Access codes", "رموز الدخول")}
             </button>
             <button
               className={view === "students" ? "active" : ""}
-              onClick={() => { setView("students"); navigate("/admin"); }}
+              onClick={() => { setView("students"); navigate("/admin"); setMobileNavOpen(false); }}
             >
               <UsersThree /> {tx("Students", "الطلاب")}
             </button>
             <button className={view === "answers" ? "active" : ""} onClick={() => {
               const targetLessonId = selectedAnswerLessonId;
               setView("answers");
+              setMobileNavOpen(false);
               if (targetLessonId) navigate(`/admin/answers/${targetLessonId}`);
             }}>
               <ClipboardText /> {tx("Student answers", "إجابات الطلاب")}
             </button>
-            <button className={view === "forensic" ? "active" : ""} onClick={() => { setView("forensic"); navigate("/admin"); }}>
+            <button className={view === "forensic" ? "active" : ""} onClick={() => { setView("forensic"); navigate("/admin"); setMobileNavOpen(false); }}>
               <MagnifyingGlass /> {tx("Forensic", "التحقق الجنائي")}
             </button>
           </div>
@@ -213,9 +255,7 @@ export function AdminPage() {
                     <span className="drag-index">
                       {String(i + 1).padStart(2, "0")}
                     </span>
-                    <div className="row-icon">
-                      <MonitorPlay />
-                    </div>
+                    <AdminLessonThumbnail lesson={l} />
                     <div className="row-copy">
                       <strong>{l.title}</strong>
                       <span>{l.description}</span>
@@ -380,7 +420,6 @@ export function AdminPage() {
                   <span>{tx("Student", "الطالب")}</span>
                   <span>{tx("Access code", "رمز الدخول")}</span>
                   <span>{tx("Device", "الجهاز")}</span>
-                  <span>{tx("Progress", "التقدّم")}</span>
                   <span></span>
                 </div>
                 {students.map((s) => (
@@ -404,9 +443,6 @@ export function AdminPage() {
                           <DeviceMobile /> {tx("Ready to bind", "جاهز للربط")}
                         </>
                       )}
-                    </span>
-                    <span>
-                      {tx(`${s.completed}/${lessons.length} lessons`, `${s.completed}/${lessons.length} دروس`)}
                     </span>
                     <button
                       className="text-button"

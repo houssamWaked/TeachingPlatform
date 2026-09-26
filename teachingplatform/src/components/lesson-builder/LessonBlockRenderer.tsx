@@ -3,7 +3,7 @@ import type { Lesson, LessonBlock } from "../../types";
 import { PdfPageReader } from "../PdfPageReader";
 import { WordDocumentReader } from "../WordDocumentReader";
 import { useLessonImageUrl } from "./useLessonImageUrl";
-import { useLocale } from "../../context/LocaleContext";
+import { useLocale } from "../../context/LocaleState";
 
 export function LessonBlockRenderer({ block, lesson, video, admin = false, onPdfViewed }: {
   block: LessonBlock;

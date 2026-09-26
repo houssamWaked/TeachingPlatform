@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Lesson, LessonBlock } from "../types";
 import { LessonBlockRenderer } from "./lesson-builder/LessonBlockRenderer";
-import { useLocale } from "../context/LocaleContext";
+import { useLocale } from "../context/LocaleState";
 
 export function LessonTabContent({ blocks, lesson, video, admin = false, onPdfViewed }: {
   blocks: LessonBlock[];

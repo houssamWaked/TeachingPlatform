@@ -1,6 +1,6 @@
 import { Plus, Trash } from "@phosphor-icons/react";
 import type { Question } from "../../types";
-import { useLocale } from "../../context/LocaleContext";
+import { useLocale } from "../../context/LocaleState";
 
 const newQuestion = (): Question => ({
   id: crypto.randomUUID(),

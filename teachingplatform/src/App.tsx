@@ -1,8 +1,9 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import { LocaleProvider, ThemeProvider } from "./context/LocaleContext";
 import { AdminPage } from "./pages/AdminPage";
 import { AccessPage, Dashboard, Landing, RequireStudent } from "./pages/PublicPages";
 import { LessonPage } from "./pages/LessonPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import "./App.css";
 import "./figma-reference.css";
 
@@ -18,7 +19,7 @@ export default function App() {
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/answers/:lessonId" element={<AdminPage />} />
           <Route path="/admin/answers/:lessonId/:studentId" element={<AdminPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </LocaleProvider>
     </ThemeProvider>

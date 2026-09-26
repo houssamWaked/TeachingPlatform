@@ -484,6 +484,11 @@ html[data-theme="dark"] .admin-row .row-meta,
 html[data-theme="dark"] .admin-row .row-copy p,
 html[data-theme="dark"] .code-sheet p,
 html[data-theme="dark"] .code-row-item { color: #9ca3a0; }
+html[data-theme="dark"] .admin-main .code-sheet code { border-color: #343a44; background: #121418; color: #f4f0e8; }
+html[data-theme="dark"] .admin-main .code-sheet > .secondary-button { border-color: #3c4941; background: #202a24; color: #b5c8ba; }
+html[data-theme="dark"] .admin-main .code-sheet > div button { color: #a7c9b2; }
+html[data-theme="dark"] .admin-main .empty-state > svg { color: #8eaa96; }
+html[data-theme="dark"] .admin-main .empty-state h3 { color: #f4f0e8; }
 html[data-theme="dark"] .admin-main button.primary-button,
 html[data-theme="dark"] .admin-main .primary-button { background: #6c8472; color: #f4f0e8; }
 html[data-theme="dark"] .admin-main input,
@@ -964,4 +969,25 @@ html[data-theme="dark"] .mobile-card-image-picker img { display: block; }
   .teacher-auth-form-side { padding-block: 12px; }
   .teacher-auth-content { gap: 12px; }
   .teacher-auth-form { gap: 10px; }
+}
+
+/* Deliberate, themed destination for invalid URLs. */
+.not-found-page { display: grid; min-height: calc(100dvh - 68px); place-items: center; padding: 40px 24px; background: var(--figma-paper); }
+.not-found-card { width: min(100%, 560px); padding: clamp(28px, 6vw, 56px); border: 1px solid var(--figma-line); border-radius: 24px; background: #fffefa; text-align: center; box-shadow: 0 16px 40px rgba(30,37,32,.08); }
+.not-found-code { margin: 0 0 8px; color: var(--figma-sage); font-family: "Bricolage Grotesque", sans-serif; font-size: clamp(64px, 12vw, 112px); font-weight: 700; line-height: .95; letter-spacing: -.06em; }
+.not-found-card h1 { margin: 14px 0 10px; color: var(--figma-ink); font-family: "Bricolage Grotesque", sans-serif; font-size: clamp(26px, 5vw, 36px); }
+.not-found-description { max-width: 380px; margin: 0 auto; color: var(--figma-muted); line-height: 1.65; }
+.not-found-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 28px; }
+.not-found-actions > a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 12px; font: inherit; font-weight: 650; text-decoration: none; }
+.not-found-actions > a svg { width: 18px; height: 18px; }
+html[data-theme="dark"] .not-found-page { background: #121418; }
+html[data-theme="dark"] .not-found-card { border-color: #2e333d; background: #1c1f26; box-shadow: 0 16px 40px rgba(0,0,0,.24); }
+html[data-theme="dark"] .not-found-card h1 { color: #f4f0e8; }
+html[data-theme="dark"] .not-found-description { color: #a8b0aa; }
+html[data-theme="dark"] .not-found-actions > .secondary-button { border-color: #3c4941; background: #202a24; color: #b5c8ba; }
+
+@media (max-width: 560px) {
+  .not-found-page { min-height: calc(100dvh - 60px); padding: 24px 18px; }
+  .not-found-actions { flex-direction: column; }
+  .not-found-actions > a { width: 100%; box-sizing: border-box; }
 }

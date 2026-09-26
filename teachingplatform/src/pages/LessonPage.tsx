@@ -12,10 +12,8 @@ import { contentWithTabs } from "../lib/lessonTabs";
 
 // ---------------------------------------------------------------------------
 // Capture-protection hooks and UI are kept in a small helper component.
-// isn't 35 lines of unrelated watermark/screenshot logic.
 // ---------------------------------------------------------------------------
 function useCaptureProtection(lessonId: string) {
-  const [watermarkCode, setWatermarkCode] = useState("");
   const [captureActive, setCaptureActive] = useState(false);
   const [captureMessage, setCaptureMessage] = useState("");
   const [shortcutCoverActive, setShortcutCoverActive] = useState(false);
@@ -23,15 +21,6 @@ function useCaptureProtection(lessonId: string) {
 
   useEffect(() => {
     if (!lessonId) return;
-    let active = true;
-
-    void api
-      .getForensicWatermark(lessonId)
-      .then((result) => {
-        if (active) setWatermarkCode(result?.watermark_code ?? "");
-      })
-      .catch(() => setWatermarkCode(""));
-
     const uninstall = installWebCaptureMonitor();
     const unsubscribe = subscribeToCaptureEvents((event) => {
       const detected = event.type !== "SCREEN_SHARING_ENDED";
@@ -82,7 +71,6 @@ function useCaptureProtection(lessonId: string) {
     window.addEventListener("keydown", onShortcutKey, true);
 
     return () => {
-      active = false;
       unsubscribe();
       uninstall();
       window.removeEventListener("keydown", onShortcutKey, true);
@@ -90,7 +78,7 @@ function useCaptureProtection(lessonId: string) {
     };
   }, [lessonId]);
 
-  return { watermarkCode, captureActive, captureMessage, shortcutCoverActive };
+  return { captureActive, captureMessage, shortcutCoverActive };
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +122,7 @@ export function LessonPage() {
     null
   );
 
-  const { watermarkCode, captureActive, captureMessage, shortcutCoverActive } = useCaptureProtection(id);
+  const { captureActive, captureMessage, shortcutCoverActive } = useCaptureProtection(id);
 
   useEffect(() => {
     setLesson(null);
@@ -193,14 +181,6 @@ export function LessonPage() {
         }`}
         onContextMenu={(e) => e.preventDefault()}
       >
-        {watermarkCode && (
-          <div className="forensic-watermark-layer" aria-hidden="true">
-            {Array.from({ length: 16 }, (_, index) => (
-              <span key={index}>{watermarkCode}</span>
-            ))}
-          </div>
-        )}
-
         {(captureActive || shortcutCoverActive) && (
           <div className="capture-protection-overlay" role="alert" aria-live="assertive">
             <div className="capture-protection-card">
@@ -340,7 +320,6 @@ export function LessonPage() {
                   lessonId={lesson.id}
                   videoId={activeVideoPart.videoId}
                   locked={false}
-                  watermarkCode={watermarkCode}
                   autoLoad
                 />
               </section>
@@ -355,7 +334,7 @@ export function LessonPage() {
                       blocks={overviewBlocks}
                       lesson={lesson}
                       video={(lessonId, videoId) => (
-                        <SecureVideo lessonId={lessonId} videoId={videoId} locked={false} watermarkCode={watermarkCode} />
+                        <SecureVideo lessonId={lessonId} videoId={videoId} locked={false} />
                       )}
                     />
                   )}

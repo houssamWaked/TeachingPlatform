@@ -11,8 +11,8 @@ type BunnyPlayer = {
 };
 type PlayerJsWindow = Window & { playerjs?: { Player: new (frame: HTMLIFrameElement) => BunnyPlayer } };
 
-export function SecureVideo({ lessonId, videoId, locked, onWatched, admin = false, watermarkCode = "", autoLoad = false }: {
-  lessonId: string; videoId?: string; locked: boolean; onWatched?: () => Promise<void>; admin?: boolean; watermarkCode?: string; autoLoad?: boolean;
+export function SecureVideo({ lessonId, videoId, locked, onWatched, admin = false, autoLoad = false }: {
+  lessonId: string; videoId?: string; locked: boolean; onWatched?: () => Promise<void>; admin?: boolean; autoLoad?: boolean;
 }) {
   const { tx } = useLocale();
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -21,8 +21,6 @@ export function SecureVideo({ lessonId, videoId, locked, onWatched, admin = fals
   const resumeAfterCaptureRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [playback, setPlayback] = useState<{ url: string; expires_in: number } | null>(null);
-  const [watermarkPos, setWatermarkPos] = useState({ top: 12, left: 14 });
-  const [now, setNow] = useState(() => new Date().toLocaleString());
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -81,14 +79,6 @@ export function SecureVideo({ lessonId, videoId, locked, onWatched, admin = fals
     return () => { disposed = true; playerRef.current = null; script?.removeEventListener("load", connect); };
   }, [playback, onWatched]);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNow(new Date().toLocaleString());
-      setWatermarkPos({ top: 8 + Math.floor(Math.random() * 70), left: 8 + Math.floor(Math.random() * 70) });
-    }, 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
   useEffect(() => subscribeToCaptureEvents((event) => {
     if (event.type === "SCREEN_SHARING_ENDED") {
       if (resumeAfterCaptureRef.current && !locked) playerRef.current?.play?.();
@@ -113,7 +103,6 @@ export function SecureVideo({ lessonId, videoId, locked, onWatched, admin = fals
   return <div className={`secure-player ${locked ? "content-obscured" : ""}${autoLoad ? " auto-preview" : ""}`}>
     {playback ? <div className="bunny-video-wrap">
       <iframe ref={iframeRef} src={playback.url} title="Secure lesson video" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
-      {watermarkCode && <div className="player-watermark" style={{ top: `${watermarkPos.top}%`, left: `${watermarkPos.left}%` }}>{watermarkCode} · {now}</div>}
     </div> : <>
       <button aria-label={tx("Play secure lesson", "ØªØ´ØºÙŠÙ„ Ø§Ù„Ø¯Ø±Ø³ Ø§Ù„Ø¢Ù…Ù†")} onClick={start} disabled={loading}>{autoLoad ? <Play weight="fill" /> : <MonitorPlay weight="fill" />}</button>
       <span>{loading && <span className="ui-spinner" aria-hidden="true" />}{loading ? "Preparing secure playback…" : "Secure video lesson"}</span>

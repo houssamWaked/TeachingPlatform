@@ -7,13 +7,6 @@ export const isDemoMode = !base;
 const SESSION = "lesson_portal_session_hint";
 const progressKey = "lesson_portal_demo_progress";
 export type StudentAnswer = { id: string; student_id: string; student_name: string; question_id: string; question_text: string; question_type: "text" | "multiple_choice"; answer_text: string; submitted_at: string };
-export type ForensicLookupResult = {
-  detected: boolean; watermark_id?: string; content_id?: string; session_id?: string; student_id?: string; student_name?: string; timestamp?: string;
-  reason?: "NO_MATCHING_RECORD" | "AMBIGUOUS_PARTIAL_CODE" | "DEMO_MODE";
-  classification: "CONFIRMED" | "PROBABLE" | "INCONCLUSIVE" | "NOT_DETECTED";
-  integrity: "VALID" | "INVALID" | "UNKNOWN"; confidence: number; extraction_quality: "HIGH" | "MEDIUM" | "LOW";
-  requires_human_review?: boolean;
-};
 const lessonHasDocument = (lesson: Lesson) => Boolean(lesson.pdf_path || lesson.word_path || [
   ...(lesson.content?.blocks ?? []),
   ...(lesson.content?.sections ?? []).flatMap((section) => section.blocks),
@@ -128,25 +121,9 @@ export const api = {
     const params = new URLSearchParams({ path });
     return request<{ url: string; expires_in: number }>(`/lessons/${id}/document?${params.toString()}`);
   },
-  async getForensicWatermark(id: string): Promise<{ watermark_code: string } | null> {
-    if (isDemoMode) {
-      let code = sessionStorage.getItem(`lesson_portal_watermark_${id}`);
-      if (!code) {
-        const random = crypto.getRandomValues(new Uint8Array(5));
-        code = `DEMO-W-${Array.from(random, (byte) => byte.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
-        sessionStorage.setItem(`lesson_portal_watermark_${id}`, code);
-      }
-      return { watermark_code: code };
-    }
-    return request(`/lessons/${id}/watermark`, { method: "POST" });
-  },
   async logCaptureEvent(event: { lesson_id: string; capture_type: string; capture_state: string; response: string }) {
     if (isDemoMode) return;
     return request("/capture-events", { method: "POST", body: JSON.stringify(event) });
-  },
-  async adminResolveWatermark(watermark_code: string): Promise<ForensicLookupResult> {
-    if (isDemoMode) return { detected: false, reason: "DEMO_MODE", classification: "INCONCLUSIVE", integrity: "UNKNOWN", confidence: 0, extraction_quality: "LOW" };
-    return request<ForensicLookupResult>("/admin/forensics/resolve", { method: "POST", body: JSON.stringify({ watermark_code }) });
   },
   async adminVideoUrl(id: string, videoId?: string) {
     if (isDemoMode) return null;

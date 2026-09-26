@@ -497,25 +497,16 @@ html[data-theme="dark"] .admin-main select { border-color: #2e333d; background: 
 html[data-theme="dark"] .admin-user { border-color: #2e333d; background: #252b35; color: #f4f0e8; }
 
 /* Dark surfaces for the admin views that retain dedicated light-theme cards. */
-html[data-theme="dark"] .admin-main .forensic-tool,
 html[data-theme="dark"] .admin-main .student-answer-row,
 html[data-theme="dark"] .admin-main .answer-card,
 html[data-theme="dark"] .admin-main .student-table { border-color: #2e333d; background: #1c1f26; color: #f4f0e8; }
-html[data-theme="dark"] .admin-main .forensic-tool summary,
-html[data-theme="dark"] .admin-main .forensic-tool form label,
 html[data-theme="dark"] .admin-main .student-answer-summary strong,
 html[data-theme="dark"] .admin-main .answer-card > header strong,
 html[data-theme="dark"] .admin-main .answer-card h2 { color: #f4f0e8; }
-html[data-theme="dark"] .admin-main .forensic-tool > p,
 html[data-theme="dark"] .admin-main .student-answer-summary span,
 html[data-theme="dark"] .admin-main .answer-card > header span { color: #a8b0aa; }
-html[data-theme="dark"] .admin-main .forensic-tool input,
 html[data-theme="dark"] .admin-main .answer-lesson-select select { border-color: #343a44; background: #121418; color: #f4f0e8; }
-html[data-theme="dark"] .admin-main .forensic-tool input::placeholder { color: #87918b; }
-html[data-theme="dark"] .admin-main .forensic-tool .secondary-button,
 html[data-theme="dark"] .admin-main .student-answer-row > .secondary-button { border-color: #3c4941; background: #202a24; color: #b5c8ba; }
-html[data-theme="dark"] .admin-main .forensic-result div { background: #252b35; }
-html[data-theme="dark"] .admin-main .forensic-no-match { border: 1px solid #594b2e; background: #30291c; color: #e8d5a7; }
 html[data-theme="dark"] .admin-main .answer-card > p { background: #121418; color: #d5dcd6; }
 html[data-theme="dark"] .admin-main .answer-card > header small { background: #25342b; color: #b5c8ba; }
 html[data-theme="dark"] .admin-main .student-table .table-head { border-color: #2e333d; background: #252b35; color: #a8b0aa; }

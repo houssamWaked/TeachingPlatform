@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { BookOpen, ClipboardText, DeviceMobile, DownloadSimple, LockKey, MagnifyingGlass, MonitorPlay, Plus, Trash, UserCircle, UsersThree, X } from "@phosphor-icons/react";
+import { BookOpen, ClipboardText, DeviceMobile, DownloadSimple, LockKey, MonitorPlay, Plus, Trash, UserCircle, UsersThree, X } from "@phosphor-icons/react";
 import { api, isDemoMode, type StudentAnswer } from "../lib/api";
 import type { Lesson, Student } from "../types";
 import { Shell } from "../context/LocaleContext";
@@ -34,7 +34,7 @@ export function AdminPage() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
-  const [view, setView] = useState<"lessons" | "codes" | "students" | "answers" | "forensic">(() => lessonId ? "answers" : "lessons");
+  const [view, setView] = useState<"lessons" | "codes" | "students" | "answers">(() => lessonId ? "answers" : "lessons");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() => window.matchMedia("(max-width: 820px)").matches);
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -63,10 +63,6 @@ export function AdminPage() {
   });
   const [savingLesson, setSavingLesson] = useState(false);
   const [lessonError, setLessonError] = useState("");
-  const [watermarkInput, setWatermarkInput] = useState("");
-  const [watermarkResult, setWatermarkResult] = useState<Awaited<ReturnType<typeof api.adminResolveWatermark>> | null>(null);
-  const [watermarkError, setWatermarkError] = useState("");
-  const [watermarkLoading, setWatermarkLoading] = useState(false);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 820px)");
     const updateViewport = () => setIsMobileViewport(media.matches);
@@ -201,9 +197,6 @@ export function AdminPage() {
               if (targetLessonId) navigate(`/admin/answers/${targetLessonId}`);
             }}>
               <ClipboardText /> {tx("Student answers", "إجابات الطلاب")}
-            </button>
-            <button className={view === "forensic" ? "active" : ""} onClick={() => { setView("forensic"); navigate("/admin"); setMobileNavOpen(false); }}>
-              <MagnifyingGlass /> {tx("Forensic", "التحقق الجنائي")}
             </button>
           </div>
           <div className="admin-user">
@@ -454,45 +447,6 @@ export function AdminPage() {
               </div>
             </>
           )}
-          {view === "forensic" && <section className="forensic-tool">
-            <h1>{tx("Forensic watermark lookup", "التحقق من العلامة المائية")}</h1>
-            <p>{tx("Enter the full code or any visible fragment in order; you do not need to know which code group it came from. Use ? for one unreadable character and * for a gap of unknown length. At least 8 readable hex characters are required. Only a unique signature-verified match identifies a learner; this does not perform OCR.", "أدخل الرمز كاملاً أو أي جزء ظاهر منه بالترتيب. استخدم ? لمحرف واحد غير مقروء و* لفجوة مجهولة الطول. يلزم إدخال 8 محارف سداسية عشرية مقروءة على الأقل. لا يحدد هوية المتعلم إلا تطابق فريد تم التحقق من توقيعه؛ ولا تُجرى هنا معالجة OCR.")}</p>
-            <form onSubmit={async (event) => {
-              event.preventDefault();
-              setWatermarkLoading(true); setWatermarkError(""); setWatermarkResult(null);
-              try { setWatermarkResult(await api.adminResolveWatermark(watermarkInput.trim().toUpperCase())); }
-              catch (error) { setWatermarkError(error instanceof Error ? error.message : tx("Could not resolve this watermark.", "تعذر التحقق من هذه العلامة المائية.")); }
-              finally { setWatermarkLoading(false); }
-            }}>
-              <label htmlFor="forensic-watermark-code">{tx("Visible watermark code", "رمز العلامة المائية الظاهر")}</label>
-              <div className="forensic-tool-row"><input id="forensic-watermark-code" value={watermarkInput} onChange={(event) => setWatermarkInput(event.target.value)} maxLength={80} required placeholder="A1?C*7F9D11" /><button className="secondary-button" disabled={watermarkLoading} aria-busy={watermarkLoading}>{watermarkLoading && <span className="ui-spinner" aria-hidden="true" />}{watermarkLoading ? tx("Checking…", "جارٍ التحقق…") : tx("Verify code", "تحقق من الرمز")}</button></div>
-            </form>
-            {watermarkError && <p className="form-error" role="alert">{watermarkError}</p>}
-            {watermarkResult && <dl className="forensic-result">
-              <div><dt>{tx("Classification", "التصنيف")}</dt><dd>{watermarkResult.classification}</dd></div>
-              <div><dt>{tx("Detected", "تم الاكتشاف")}</dt><dd>{watermarkResult.detected ? tx("Yes", "نعم") : tx("No", "لا")}</dd></div>
-              <div><dt>{tx("Integrity", "سلامة البيانات")}</dt><dd>{watermarkResult.integrity}</dd></div>
-              <div><dt>{tx("Confidence", "مستوى الثقة")}</dt><dd>{watermarkResult.confidence}%</dd></div>
-              <div><dt>{tx("Extraction quality", "جودة الاستخراج")}</dt><dd>{watermarkResult.extraction_quality}</dd></div>
-              {watermarkResult.watermark_id && <div><dt>{tx("Watermark ID", "معرّف العلامة المائية")}</dt><dd>{watermarkResult.watermark_id}</dd></div>}
-              {watermarkResult.content_id && <div><dt>{tx("Content ID", "معرّف المحتوى")}</dt><dd>{watermarkResult.content_id}</dd></div>}
-              {watermarkResult.detected && <div><dt>{tx("Associated learner", "المتعلم المرتبط")}</dt><dd>{watermarkResult.student_name || tx("Name not returned by API", "لم تُرجع الواجهة اسم المتعلم")}</dd></div>}
-              {watermarkResult.student_id && <div><dt>{tx("Student ID", "معرّف الطالب")}</dt><dd>{watermarkResult.student_id}</dd></div>}
-              {watermarkResult.session_id && <div><dt>{tx("Session reference", "مرجع الجلسة")}</dt><dd>{watermarkResult.session_id}</dd></div>}
-              {watermarkResult.timestamp && <div><dt>{tx("Issued", "تاريخ الإصدار")}</dt><dd>{new Date(watermarkResult.timestamp).toLocaleString()}</dd></div>}
-              <p>{tx("Use as evidence for authorized human review only. Do not automatically accuse or penalize a learner.", "استخدم هذه النتيجة كدليل لمراجعة بشرية مخوّلة فقط. لا تتهم المتعلم أو تعاقبه تلقائياً.")}</p>
-            </dl>}
-            {watermarkResult?.detected && watermarkResult.integrity === "VALID" && !watermarkResult.student_name && <p className="forensic-no-match" role="status">
-              {tx("This code is valid, but the API did not return the learner name. Deploy the latest Supabase api Edge Function, then verify the lookup again. The current function resolves the watermark’s student ID to the learner record.", "هذا الرمز صالح، لكن الواجهة لم تُرجع اسم المتعلم. انشر أحدث إصدار من دالة Supabase api، ثم أعد التحقق. تحوّل الدالة الحالية معرّف الطالب المرتبط بالعلامة إلى سجل المتعلم.")}
-            </p>}
-          {watermarkResult && !watermarkResult.detected && <p className="forensic-no-match" role="status">
-              {watermarkResult.reason === "DEMO_MODE"
-                ? tx("This app is in demo mode, so watermark lookup cannot identify a learner. Configure VITE_API_BASE_URL for the deployed Supabase API, rebuild and deploy the frontend, and open the lesson again to issue a server-registered watermark.", "التطبيق يعمل في الوضع التجريبي، لذلك لا يمكن للتحقق من العلامة تحديد المتعلم. اضبط VITE_API_BASE_URL لواجهة Supabase المنشورة، ثم أعد بناء الواجهة ونشرها وافتح الدرس مجدداً لإصدار علامة مسجلة على الخادم.")
-                : watermarkResult.reason === "AMBIGUOUS_PARTIAL_CODE"
-                  ? tx("Several issued codes match this fragment. Add more readable characters from the image, or narrow the unknown gap with ? (one character) or * (any-length gap), then verify again. No learner was identified.", "تطابق هذا الجزء مع عدة رموز صادرة. أضف محارف مقروءة أكثر من الصورة، أو حدّد الفجوة المجهولة باستخدام ? لمحرف واحد أو * لفجوة بأي طول، ثم أعد التحقق. لم يتم تحديد أي متعلم.")
-                  : tx("No learner can be identified from this code: there is no matching server record. Check for a mistyped character, an older code, or that the app and Edge Function use the same Supabase project and that the watermark migration and secret were configured before this lesson was opened.", "تعذر تحديد متعلم من هذا الرمز لعدم وجود سجل مطابق على الخادم. تحقق من المحارف، ومن أن الرمز ليس قديماً، وأن التطبيق ودالة Edge يستخدمان مشروع Supabase نفسه، وأن ترحيل العلامات والسر قد أُعدّا قبل فتح هذا الدرس.")}
-          </p>}
-          </section>}
           </>}
         </section>
       </main>

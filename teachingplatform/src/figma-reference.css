@@ -1281,3 +1281,20 @@ html[data-theme="dark"] .lesson-loading-title { background: linear-gradient(90de
 .teacher-profile-photo small { color: #718078; font-size: 12px; }
 html[data-theme="dark"] .teacher-profile-photo > div { background: #252b35; color: #a7c9b2; }
 html[data-theme="dark"] .teacher-profile-photo small { color: #a8b0aa; }
+
+/* Admin dialogs follow the active theme, including lesson creation and enrollment. */
+html[data-theme="dark"] .modal { border-color: #343a44; background: #1c1f26; color: #e6e2da; box-shadow: 0 30px 90px rgba(0, 0, 0, .48); }
+html[data-theme="dark"] .modal > p,
+html[data-theme="dark"] .modal label,
+html[data-theme="dark"] .modal label > small,
+html[data-theme="dark"] .modal .student-course-options small { color: #a8b0aa; }
+html[data-theme="dark"] .modal .modal-head h2 { color: #f4f0e8; }
+html[data-theme="dark"] .modal .eyebrow { color: #a7c9b2; }
+html[data-theme="dark"] .modal input:not([type="checkbox"]),
+html[data-theme="dark"] .modal textarea,
+html[data-theme="dark"] .modal select { border-color: #39414d; background: #121418; color: #f4f0e8; color-scheme: dark; }
+html[data-theme="dark"] .modal input::placeholder,
+html[data-theme="dark"] .modal textarea::placeholder { color: #8e9892; }
+html[data-theme="dark"] .modal .modal-head > button { border-color: #39414d; background: #252b35; color: #c4d8c9; }
+html[data-theme="dark"] .modal .primary-button { border-color: #6c8472; background: #6c8472; color: #f4f0e8; }
+html[data-theme="dark"] .modal .secondary-button { border-color: #39414d; background: #252b35; color: #e6e2da; }

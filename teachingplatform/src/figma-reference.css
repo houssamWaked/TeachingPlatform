@@ -1213,7 +1213,7 @@ html[data-theme="dark"] .student-profile-name-field input { border-color: #39414
 .course-detail-row > div strong { color: var(--figma-ink); }
 .course-detail-row > div span, .course-detail-empty { color: var(--figma-muted); font-size: 13px; }
 .course-detail-empty { margin: 0; padding: 12px 0; }
-.course-student-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 54px; border-top: 1px solid var(--figma-line); }
+.course-student-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; min-height: 54px; border-top: 1px solid var(--figma-line); }
 .course-student-row > svg { width: 26px; height: 26px; color: var(--figma-sage); }
 .course-student-row > span { color: var(--figma-muted); font-size: 13px; }
 html[data-theme="dark"] .course-admin-card-compact h2,
@@ -1237,8 +1237,9 @@ html[data-theme="dark"] .course-student-row { border-color: #343a44; }
   .course-detail-row { grid-template-columns: minmax(0, 1fr) auto; gap: 7px 12px; }
   .course-detail-row > .publish-badge { grid-column: 2; grid-row: 1; }
   .course-detail-row > .text-button { grid-column: 1 / -1; justify-self: start; }
-  .course-student-row { grid-template-columns: 28px minmax(0, 1fr); gap: 4px 10px; padding: 9px 0; }
+  .course-student-row { grid-template-columns: 28px minmax(0, 1fr) auto; gap: 4px 10px; padding: 9px 0; }
   .course-student-row > span { grid-column: 2; }
+  .course-student-row > .text-button { grid-column: 3; grid-row: 1 / span 2; }
 }
 
 /* Keep the lesson player chrome in place while its data is loading. */
@@ -1255,3 +1256,17 @@ html[data-theme="dark"] .lesson-loading-title { background: linear-gradient(90de
   .lesson-loading-workspace { min-height: 100%; }
   .lesson-loading-sidebar.admin-sidebar { pointer-events: none; }
 }
+
+.admin-sidebar .admin-user { width: 100%; text-align: left; cursor: pointer; }
+.admin-sidebar .admin-user:hover { filter: brightness(.97); }
+.admin-sidebar .admin-user:focus-visible { outline: 3px solid #2a8f80; outline-offset: 2px; }
+.admin-user .admin-user-avatar { flex: 0 0 32px; width: 32px; height: 32px; overflow: hidden; border-radius: 50%; object-fit: cover; }
+.teacher-profile-modal > label { display: grid; gap: 8px; }
+.teacher-profile-photo { display: grid; grid-template-columns: 82px minmax(0, 1fr); align-items: center; gap: 8px 14px; margin: 2px 0 20px; }
+.teacher-profile-photo > div { display: grid; grid-row: span 2; place-items: center; width: 82px; height: 82px; overflow: hidden; border-radius: 50%; background: #eaf0eb; color: #668071; font-size: 54px; }
+.teacher-profile-photo img { width: 100%; height: 100%; object-fit: cover; }
+.teacher-profile-photo > label { justify-self: start; min-height: 40px; cursor: pointer; }
+.teacher-profile-photo input { position: absolute; width: 1px !important; height: 1px; overflow: hidden; opacity: 0; }
+.teacher-profile-photo small { color: #718078; font-size: 12px; }
+html[data-theme="dark"] .teacher-profile-photo > div { background: #252b35; color: #a7c9b2; }
+html[data-theme="dark"] .teacher-profile-photo small { color: #a8b0aa; }

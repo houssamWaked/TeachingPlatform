@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, BookOpen, ClipboardText, DeviceMobile, DownloadSimple, GraduationCap, Image, LockKey, MonitorPlay, PencilSimple, Plus, Trash, UserCircle, UsersThree, X } from "@phosphor-icons/react";
-import { api, isDemoMode, type StudentAnswer } from "../lib/api";
+import { api, isDemoMode, type StudentAnswer, type TeacherProfile } from "../lib/api";
 import type { Course, Lesson, Student } from "../types";
 import { Shell } from "../context/LocaleContext";
 import { useLocale } from "../context/LocaleState";
@@ -24,6 +24,32 @@ function AdminLessonThumbnail({ lesson }: { lesson: Lesson }) {
   );
 }
 
+function TeacherProfileDialog({ profile, onClose, onSaved }: { profile: TeacherProfile; onClose: () => void; onSaved: (profile: TeacherProfile) => void }) {
+  const { tx } = useLocale();
+  const [name, setName] = useState(profile.name);
+  const [photo, setPhoto] = useState<File>();
+  const [photoPreview, setPhotoPreview] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => () => { if (photoPreview.startsWith("blob:")) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true); setError("");
+    try { onSaved(await api.updateAdminProfile(name, photo)); onClose(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : tx("Your profile could not be saved.", "تعذر حفظ ملفك الشخصي.")); }
+    finally { setSaving(false); }
+  }
+  return <div className="modal-backdrop" onMouseDown={() => !saving && onClose()}>
+    <form className="modal teacher-profile-modal" onSubmit={submit} onMouseDown={(event) => event.stopPropagation()}>
+      <div className="modal-head"><div><p className="eyebrow">{tx("TEACHER ACCOUNT", "حساب المعلم")}</p><h2>{tx("Teacher profile", "ملف المعلم")}</h2></div><button type="button" onClick={onClose} aria-label={tx("Close", "إغلاق")}><X /></button></div>
+      <div className="teacher-profile-photo"><div>{photoPreview || profile.photo_url ? <img src={photoPreview || profile.photo_url} alt={tx("Teacher profile photo", "صورة ملف المعلم")} /> : <UserCircle aria-hidden="true" />}</div><label className="secondary-button">{tx("Choose profile photo", "اختيار صورة الملف")}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (photoPreview.startsWith("blob:")) URL.revokeObjectURL(photoPreview); setPhoto(file); setPhotoPreview(file ? URL.createObjectURL(file) : ""); }} /></label><small>{tx("JPEG, PNG, or WebP, up to 5 MB.", "JPEG أو PNG أو WebP، حتى 5 ميغابايت.")}</small></div>
+      <label>{tx("Your name", "اسمك")}<input required maxLength={80} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <div className="modal-actions"><button type="button" className="secondary-button" disabled={saving} onClick={onClose}>{tx("Cancel", "إلغاء")}</button><button className="primary-button" disabled={saving} aria-busy={saving}>{saving ? tx("Saving…", "جارٍ الحفظ…") : tx("Save profile", "حفظ الملف")}</button></div>
+    </form>
+  </div>;
+}
+
 export function AdminPage() {
   const { tx } = useLocale();
   const navigate = useNavigate();
@@ -41,6 +67,11 @@ export function AdminPage() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [teacherProfile, setTeacherProfile] = useState<TeacherProfile>(() => ({
+    name: localStorage.getItem("lesson_portal_teacher_name") || "Teacher",
+    photo_url: localStorage.getItem("lesson_portal_teacher_photo") || "",
+  }));
+  const [showTeacherProfile, setShowTeacherProfile] = useState(false);
   const [portalLoading, setPortalLoading] = useState(true);
   const [portalError, setPortalError] = useState("");
   const [portalRefresh, setPortalRefresh] = useState(0);
@@ -73,9 +104,10 @@ export function AdminPage() {
   const [courseImageFile, setCourseImageFile] = useState<File | null>(null);
   const [savingCourse, setSavingCourse] = useState(false);
   const [courseError, setCourseError] = useState("");
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-  const [studentCourseIds, setStudentCourseIds] = useState<string[]>([]);
-  const [savingStudent, setSavingStudent] = useState(false);
+  const [enrollingCourseId, setEnrollingCourseId] = useState("");
+  const [selectedEnrollStudentIds, setSelectedEnrollStudentIds] = useState<string[]>([]);
+  const [savingEnrollments, setSavingEnrollments] = useState(false);
+  const [enrollmentError, setEnrollmentError] = useState("");
   const [newLessonCourseId, setNewLessonCourseId] = useState("");
   useEffect(() => {
     const media = window.matchMedia("(max-width: 820px)");
@@ -102,6 +134,17 @@ export function AdminPage() {
       .finally(() => { if (active) setPortalLoading(false); });
     return () => { active = false; };
   }, [authenticated, portalRefresh]);
+  useEffect(() => {
+    if (!authenticated) return;
+    let active = true;
+    api.adminProfile().then((profile) => {
+      if (!active) return;
+      setTeacherProfile(profile);
+      localStorage.setItem("lesson_portal_teacher_name", profile.name);
+      if (profile.photo_url) localStorage.setItem("lesson_portal_teacher_photo", profile.photo_url);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [authenticated]);
   const selectedAnswerLessonId = answerLessonId || lessonId || lessons[0]?.id || "";
   const selectedCourse = courses.find((course) => course.id === selectedCourseId) ?? null;
   const selectedAnswerStudent = students.find((student) => student.id === studentId);
@@ -200,16 +243,35 @@ export function AdminPage() {
     } catch (error) { setActionError(error instanceof Error ? error.message : "The lesson could not be assigned."); }
     finally { setAssigningLessonId(""); }
   }
-  async function saveStudentCourses(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editingStudent) return;
-    setSavingStudent(true); setActionError("");
+  async function enrollSelectedStudents(event: React.FormEvent) {
+    event.preventDefault();
+    const courseId = enrollingCourseId;
+    if (!courseId || !selectedEnrollStudentIds.length) return;
+    setSavingEnrollments(true); setEnrollmentError("");
+    const updated: Student[] = [];
     try {
-      await api.updateStudentCourses(editingStudent.id, studentCourseIds);
-      setStudents((items) => items.map((student) => student.id === editingStudent.id ? { ...student, course_ids: studentCourseIds } : student));
-      setEditingStudent(null);
+      for (const studentId of selectedEnrollStudentIds) {
+        const student = students.find((item) => item.id === studentId);
+        if (!student) continue;
+        const course_ids = [...new Set([...(student.course_ids ?? []), courseId])];
+        await api.updateStudentCourses(student.id, course_ids);
+        updated.push({ ...student, course_ids });
+      }
+      if (updated.length) setStudents((items) => items.map((student) => updated.find((next) => next.id === student.id) ?? student));
+      setEnrollingCourseId(""); setSelectedEnrollStudentIds([]);
+    } catch (error) {
+      if (updated.length) setStudents((items) => items.map((student) => updated.find((next) => next.id === student.id) ?? student));
+      setEnrollmentError(error instanceof Error ? error.message : "Students could not be enrolled.");
+    } finally { setSavingEnrollments(false); }
+  }
+  async function removeCourseEnrollment(student: Student, courseId: string) {
+    if (!window.confirm(`Remove ${student.name} from this course?`)) return;
+    setActionError("");
+    try {
+      const course_ids = (student.course_ids ?? []).filter((id) => id !== courseId);
+      await api.updateStudentCourses(student.id, course_ids);
+      setStudents((items) => items.map((item) => item.id === student.id ? { ...item, course_ids } : item));
     } catch (error) { setActionError(error instanceof Error ? error.message : "Course access could not be updated."); }
-    finally { setSavingStudent(false); }
   }
   async function removeStudent(student: Student) {
     if (!window.confirm(`Delete ${student.name}? Their quiz answers and lesson progress will also be removed.`)) return;
@@ -217,7 +279,6 @@ export function AdminPage() {
     try {
       await api.deleteStudent(student.id);
       setStudents((items) => items.filter((item) => item.id !== student.id));
-      setEditingStudent(null);
     } catch (error) { setActionError(error instanceof Error ? error.message : "The student could not be deleted."); }
     finally { setDeletingStudentId(""); }
   }
@@ -233,16 +294,16 @@ export function AdminPage() {
           <div className="admin-sidebar-nav">
             <p>{tx("MANAGE", "الإدارة")}</p>
             <button
-              className={view === "lessons" ? "active" : ""}
-              onClick={() => { setView("lessons"); navigate("/admin"); setMobileNavOpen(false); }}
-            >
-              <BookOpen /> {tx("Lessons", "الدروس")}
-            </button>
-            <button
               className={view === "courses" ? "active" : ""}
               onClick={() => { setView("courses"); setSelectedCourseId(""); navigate("/admin"); setMobileNavOpen(false); }}
             >
               <GraduationCap /> {tx("Courses", "الدورات")}
+            </button>
+            <button
+              className={view === "lessons" ? "active" : ""}
+              onClick={() => { setView("lessons"); navigate("/admin"); setMobileNavOpen(false); }}
+            >
+              <BookOpen /> {tx("Lessons", "الدروس")}
             </button>
             <button
               className={view === "codes" ? "active" : ""}
@@ -265,13 +326,13 @@ export function AdminPage() {
               <ClipboardText /> {tx("Student answers", "إجابات الطلاب")}
             </button>
           </div>
-          <div className="admin-user">
-            <UserCircle weight="duotone" />
+          <button type="button" className="admin-user" onClick={() => setShowTeacherProfile(true)} aria-label={tx("Edit teacher profile", "تعديل ملف المعلم")} title={tx("Edit teacher profile", "تعديل ملف المعلم")}>
+            {teacherProfile.photo_url ? <img className="admin-user-avatar" src={teacherProfile.photo_url} alt="" /> : <UserCircle weight="duotone" aria-hidden="true" />}
             <span>
-              <strong>{tx("Teacher", "المعلّم")}</strong>
-              <small>{tx("Administrator", "المدير")}</small>
+              <strong>{teacherProfile.name}</strong>
+              <small>{tx("Teacher profile", "ملف المعلم")}</small>
             </span>
-          </div>
+          </button>
         </aside>
         <section className="admin-main">
           {portalLoading ? (
@@ -383,9 +444,9 @@ export function AdminPage() {
                   </label>}
                 </section>
                 <section className="course-detail-section">
-                  <div className="course-detail-section-heading"><div><h2>{tx("Enrolled students", "الطلاب المسجلون")}</h2><p>{tx(`${students.filter((student) => student.course_ids?.includes(selectedCourse.id)).length} students`, `${students.filter((student) => student.course_ids?.includes(selectedCourse.id)).length} طلاب`)}</p></div></div>
+                  <div className="course-detail-section-heading"><div><h2>{tx("Enrolled students", "الطلاب المسجلون")}</h2><p>{tx(`${students.filter((student) => student.course_ids?.includes(selectedCourse.id)).length} students`, `${students.filter((student) => student.course_ids?.includes(selectedCourse.id)).length} طلاب`)}</p></div><button className="primary-button" onClick={() => { setEnrollingCourseId(selectedCourse.id); setSelectedEnrollStudentIds([]); setEnrollmentError(""); }}><Plus /> {tx("Enroll student", "تسجيل طالب")}</button></div>
                   <div className="course-detail-list">
-                    {students.filter((student) => student.course_ids?.includes(selectedCourse.id)).map((student) => <div className="course-student-row" key={student.id}><UserCircle aria-hidden="true" /><strong>{student.name}</strong><span>{tx("Access code", "رمز الدخول")}: {student.code}</span></div>)}
+                    {students.filter((student) => student.course_ids?.includes(selectedCourse.id)).map((student) => <div className="course-student-row" key={student.id}><UserCircle aria-hidden="true" /><strong>{student.name}</strong><span>{tx("Access code", "رمز الدخول")}: {student.code}</span><button type="button" className="text-button danger-button" onClick={() => void removeCourseEnrollment(student, selectedCourse.id)}>{tx("Remove", "إزالة")}</button></div>)}
                     {!students.some((student) => student.course_ids?.includes(selectedCourse.id)) && <p className="course-detail-empty">{tx("No students are enrolled in this course yet.", "لا يوجد طلاب مسجلون في هذه الدورة بعد.")}</p>}
                   </div>
                 </section>
@@ -542,7 +603,6 @@ export function AdminPage() {
                       )}
                     </span>
                     <span className="student-row-actions">
-                      <button className="text-button" onClick={() => { setEditingStudent(s); setStudentCourseIds(s.course_ids ?? []); }}>{tx("Edit access", "تعديل الوصول")}</button>
                       <button className="text-button" disabled={resettingStudentId === s.id} aria-busy={resettingStudentId === s.id} onClick={async () => {
                         setResettingStudentId(s.id); setActionError("");
                         try { await api.resetDevice(s.id); setStudents((v) => v.map((x) => x.id === s.id ? { ...x, device_locked: false } : x)); }
@@ -584,16 +644,24 @@ export function AdminPage() {
           </form>
         </div>
       )}
-      {editingStudent && (
-        <div className="modal-backdrop" onMouseDown={() => !savingStudent && setEditingStudent(null)}>
-          <form className="modal student-course-modal" onSubmit={saveStudentCourses} onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><p className="eyebrow">{tx("STUDENT ACCESS", "دخول الطالب")}</p><h2>{tx(`Edit ${editingStudent.name}`, `تعديل ${editingStudent.name}`)}</h2></div><button type="button" onClick={() => setEditingStudent(null)} aria-label={tx("Close", "إغلاق")}><X /></button></div>
-            <p>{tx("Choose which courses this student can open. Access updates immediately after saving.", "اختر الدورات التي يمكن لهذا الطالب فتحها. يتم تحديث الوصول بعد الحفظ مباشرة.")}</p>
-            <div className="student-course-options">{courses.map((course) => <label key={course.id}><input type="checkbox" checked={studentCourseIds.includes(course.id)} onChange={(event) => setStudentCourseIds((current) => event.target.checked ? [...current, course.id] : current.filter((id) => id !== course.id))} /><span><strong>{course.name}</strong><small>{lessons.filter((lesson) => lesson.course_id === course.id).length} {tx("lessons", "دروس")}</small></span></label>)}</div>
-            <div className="student-modal-footer"><button type="button" className="text-button danger-button" disabled={savingStudent || deletingStudentId === editingStudent.id} onClick={() => void removeStudent(editingStudent)}>{tx("Delete student", "حذف الطالب")}</button><div className="modal-actions"><button type="button" className="secondary-button" disabled={savingStudent} onClick={() => setEditingStudent(null)}>{tx("Cancel", "إلغاء")}</button><button className="primary-button" disabled={savingStudent} aria-busy={savingStudent}>{savingStudent && <span className="ui-spinner" aria-hidden="true" />}{savingStudent ? tx("Saving…", "جارٍ الحفظ…") : tx("Save access", "حفظ الوصول")}</button></div></div>
+      {enrollingCourseId && (
+        <div className="modal-backdrop" onMouseDown={() => !savingEnrollments && setEnrollingCourseId("")}>
+          <form className="modal student-course-modal" onSubmit={enrollSelectedStudents} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><p className="eyebrow">{tx("COURSE ACCESS", "صلاحية الدورة")}</p><h2>{tx("Enroll students", "تسجيل الطلاب")}</h2></div><button type="button" onClick={() => setEnrollingCourseId("")} aria-label={tx("Close", "إغلاق")}><X /></button></div>
+            <p>{tx(`Choose students to enroll in ${courses.find((course) => course.id === enrollingCourseId)?.name ?? "this course"}.`, `اختر الطلاب لتسجيلهم في ${courses.find((course) => course.id === enrollingCourseId)?.name ?? "هذه الدورة"}.`)}</p>
+            <div className="student-course-options">{students.filter((student) => !student.course_ids?.includes(enrollingCourseId)).map((student) => <label key={student.id}><input type="checkbox" checked={selectedEnrollStudentIds.includes(student.id)} onChange={(event) => setSelectedEnrollStudentIds((current) => event.target.checked ? [...current, student.id] : current.filter((id) => id !== student.id))} /><span><strong>{student.name}</strong><small>{tx("Access code", "رمز الدخول")}: {student.code}</small></span></label>)}
+              {!students.some((student) => !student.course_ids?.includes(enrollingCourseId)) && <p className="course-detail-empty">{tx("All students already have access to this course.", "لدى جميع الطلاب صلاحية الوصول إلى هذه الدورة بالفعل.")}</p>}
+            </div>
+            {enrollmentError && <p className="form-error" role="alert">{enrollmentError}</p>}
+            <div className="modal-actions"><button type="button" className="secondary-button" disabled={savingEnrollments} onClick={() => setEnrollingCourseId("")}>{tx("Cancel", "إلغاء")}</button><button className="primary-button" disabled={savingEnrollments || !selectedEnrollStudentIds.length} aria-busy={savingEnrollments}>{savingEnrollments && <span className="ui-spinner" aria-hidden="true" />}{savingEnrollments ? tx("Enrolling…", "جارٍ التسجيل…") : tx("Enroll selected", "تسجيل المحددين")}</button></div>
           </form>
         </div>
       )}
+      {showTeacherProfile && <TeacherProfileDialog profile={teacherProfile} onClose={() => setShowTeacherProfile(false)} onSaved={(profile) => {
+        setTeacherProfile(profile);
+        localStorage.setItem("lesson_portal_teacher_name", profile.name);
+        if (profile.photo_url) localStorage.setItem("lesson_portal_teacher_photo", profile.photo_url);
+      }} />}
       {editingLesson && (
         <LessonBuilder
           lesson={editingLesson}

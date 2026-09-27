@@ -12,6 +12,7 @@ const demoStudentCoursesKey = "lesson_portal_demo_student_courses";
 const demoDeletedStudentsKey = "lesson_portal_demo_deleted_students";
 export type StudentAnswer = { id: string; student_id: string; student_name: string; question_id: string; question_text: string; question_type: "text" | "multiple_choice"; answer_text: string; submitted_at: string };
 export type StudentProfile = { name: string; photo_url: string };
+export type TeacherProfile = { name: string; photo_url: string };
 const lessonHasDocument = (lesson: Lesson) => Boolean(lesson.pdf_path || lesson.word_path || [
   ...(lesson.content?.blocks ?? []),
   ...(lesson.content?.sections ?? []).flatMap((section) => section.blocks),
@@ -257,6 +258,29 @@ export const api = {
     } catch {
       return false;
     }
+  },
+  async adminProfile(): Promise<TeacherProfile> {
+    if (isDemoMode) return {
+      name: localStorage.getItem("lesson_portal_teacher_name") || "Teacher",
+      photo_url: localStorage.getItem("lesson_portal_teacher_photo") || "",
+    };
+    return request<TeacherProfile>("/admin/profile");
+  },
+  async updateAdminProfile(name: string, photo?: File): Promise<TeacherProfile> {
+    const cleanName = name.trim().replace(/\s+/g, " ");
+    if (!cleanName) throw new Error("Enter your name.");
+    if (cleanName.length > 80) throw new Error("Name must be 80 characters or fewer.");
+    if (photo && !["image/jpeg", "image/png", "image/webp"].includes(photo.type)) throw new Error("Choose a JPEG, PNG, or WebP image.");
+    if (photo && photo.size > 5 * 1024 * 1024) throw new Error("Choose an image smaller than 5 MB.");
+    if (isDemoMode) {
+      localStorage.setItem("lesson_portal_teacher_name", cleanName);
+      if (photo) localStorage.setItem("lesson_portal_teacher_photo", await api.readImage(photo));
+      return api.adminProfile();
+    }
+    const form = new FormData();
+    form.append("name", cleanName);
+    if (photo) form.append("photo", photo);
+    return requestForm<TeacherProfile>("/admin/profile", form);
   },
   async adminLessons() {
     return isDemoMode ? loadLessons() : request<Lesson[]>("/admin/lessons");

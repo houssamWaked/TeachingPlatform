@@ -96,6 +96,13 @@ const signedCourse = async (course: Record<string, unknown>) => {
   if (error) throw error;
   return { ...course, image_url: data.signedUrl };
 };
+const signedTeacherProfile = async (profile: Record<string, unknown> | null) => {
+  const imagePath = typeof profile?.profile_image_path === "string" ? profile.profile_image_path : "";
+  if (!imagePath) return { name: typeof profile?.name === "string" ? profile.name : "Teacher", photo_url: "" };
+  const { data, error } = await db.storage.from("lesson-pdfs").createSignedUrl(imagePath, 3600);
+  if (error) throw error;
+  return { name: typeof profile?.name === "string" ? profile.name : "Teacher", photo_url: data.signedUrl };
+};
 const studentCanAccessLesson = async (studentId: string, lessonId: string) => {
   const { data: lesson, error: lessonError } = await db.from("lessons").select("course_id").eq("id", lessonId).eq("published", true).maybeSingle();
   if (lessonError) throw lessonError;
@@ -199,6 +206,34 @@ Deno.serve(async (req) => {
 
     if (path.startsWith("/admin/")) {
       await requireAdmin(req);
+      if (path === "/admin/profile" && req.method === "GET") {
+        const { data, error } = await db.from("teacher_profile").select("name,profile_image_path").eq("id", true).maybeSingle();
+        if (error) throw error;
+        return json(await signedTeacherProfile(data));
+      }
+      if (path === "/admin/profile" && req.method === "POST") {
+        const form = await req.formData();
+        const name = typeof form.get("name") === "string" ? String(form.get("name")).trim().replace(/\s+/g, " ") : "";
+        if (!name || name.length > 80) return fail("Name must be 1–80 characters.");
+        const { data: current, error: readError } = await db.from("teacher_profile").select("profile_image_path").eq("id", true).maybeSingle();
+        if (readError) throw readError;
+        let imagePath = typeof current?.profile_image_path === "string" ? current.profile_image_path : null;
+        const photo = form.get("photo");
+        if (photo instanceof File && photo.size > 0) {
+          const extension = validImageType(photo);
+          if (!extension) return fail("Choose a JPEG, PNG, or WebP image.");
+          if (photo.size > 5 * 1024 * 1024) return fail("Profile images must be 5 MB or smaller.", 413);
+          imagePath = `teacher/profile/${crypto.randomUUID()}.${extension}`;
+          const { error } = await db.storage.from("lesson-pdfs").upload(imagePath, photo, { contentType: photo.type, upsert: false });
+          if (error) throw error;
+        }
+        const { data, error } = await db.from("teacher_profile").upsert({ id: true, name, profile_image_path: imagePath, updated_at: new Date().toISOString() }).select("name,profile_image_path").single();
+        if (error) throw error;
+        if (imagePath && current?.profile_image_path && imagePath !== current.profile_image_path) {
+          await db.storage.from("lesson-pdfs").remove([current.profile_image_path]);
+        }
+        return json(await signedTeacherProfile(data));
+      }
       if (path === "/admin/forensics/resolve" && req.method === "POST") {
         const { watermark_code } = await req.json();
         if (typeof watermark_code !== "string" || watermark_code.length > 80) return fail("Enter a valid watermark code.");

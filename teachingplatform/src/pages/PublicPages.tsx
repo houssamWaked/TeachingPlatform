@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from "react";
-import { Navigate, NavLink, useNavigate } from "react-router-dom";
-import { ArrowRight, BookOpen, Clock, DeviceMobile, LockKey, X } from "@phosphor-icons/react";
+import { Navigate, NavLink, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, ArrowRight, BookOpen, Clock, DeviceMobile, LockKey, UserCircle, X } from "@phosphor-icons/react";
 import { api, isDemoMode } from "../lib/api";
 import type { Course, Lesson } from "../types";
 import { Brand, Shell, ThemeToggle } from "../context/LocaleContext";
@@ -204,7 +204,9 @@ export function Dashboard() {
       <header className="student-dashboard-nav">
         <div className="brand"><Brand /></div>
         <div className="student-dashboard-nav-actions">
-          {studentName && <span className="student-name-pill"><span aria-hidden="true" />{studentName}</span>}
+          <NavLink to="/profile" className="student-dashboard-profile-link" aria-label={tx("Student profile", "ملف الطالب")}>
+            <UserCircle aria-hidden="true" />{studentName && <span>{studentName}</span>}
+          </NavLink>
           <ThemeToggle />
           <button type="button" onClick={() => { api.signOut(); location.assign("/"); }}>{tx("Exit Portal", "الخروج")}</button>
         </div>
@@ -220,12 +222,12 @@ export function Dashboard() {
         </section>
         <div className="section-title">
           <h2>{tx("Your courses", "دوراتك")}</h2>
-          <span>{tx(`${courses.reduce((total, course) => total + (course.lessons?.length ?? 0), 0)} lessons`, `${courses.reduce((total, course) => total + (course.lessons?.length ?? 0), 0)} دروس`)}</span>
+          <span>{tx(`${courses.length} courses`, `${courses.length} دورات`)}</span>
         </div>
         {loading ? (
-          <div className="lesson-grid">
+          <div className="student-course-list">
             {[1, 2, 3].map((i) => (
-              <div className="lesson-card skeleton" key={i} />
+              <div className="student-course skeleton" key={i} />
             ))}
           </div>
         ) : error ? (
@@ -236,11 +238,11 @@ export function Dashboard() {
           </div>
         ) : courses.length ? (
           <div className="student-course-list">
-            {courses.map((course) => <section className="student-course" key={course.id}>
+            {courses.map((course) => <NavLink className="student-course" to={`/courses/${course.id}`} key={course.id}>
               {course.image_url || course.image_path?.startsWith("data:image/") ? <img className="student-course-image" src={course.image_url || course.image_path} alt="" loading="lazy" /> : <div className="student-course-image student-course-image-empty"><BookOpen aria-hidden="true" /></div>}
               <div className="student-course-heading"><h2>{course.name}</h2>{course.description && <p>{course.description}</p>}</div>
-              {course.lessons?.length ? <div className="lesson-grid">{course.lessons.map((lesson, index) => <DashboardLessonCard key={lesson.id} lesson={lesson} index={index} />)}</div> : <p className="student-course-empty">{tx("No lessons are available in this course yet.", "لا توجد دروس متاحة في هذه الدورة بعد.")}</p>}
-            </section>)}
+              <span className="student-course-open">{tx("Open course", "افتح الدورة")} <ArrowRight aria-hidden="true" /></span>
+            </NavLink>)}
           </div>
         ) : (
           <div className="empty-state"><h3>{tx("No courses assigned yet", "لم يتم تعيين دورات بعد")}</h3><p>{tx("Ask your teacher to give you access to a course.", "اطلب من معلمك منحك صلاحية الوصول إلى دورة.")}</p></div>
@@ -248,4 +250,42 @@ export function Dashboard() {
       </main>
     </Shell>
   );
+}
+
+export function CoursePage() {
+  const { tx } = useLocale();
+  const { id = "" } = useParams();
+  const [course, setCourse] = useState<Course | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    api.getCourses().then((courses) => {
+      if (active) setCourse(courses.find((item) => item.id === id) ?? null);
+    }).catch((reason) => {
+      if (active) setError(reason instanceof Error ? reason.message : tx("Could not load this course.", "تعذر تحميل الدورة."));
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [id, tx]);
+  const studentName = localStorage.getItem("lesson_portal_student_name")?.trim();
+  return <Shell hideHeader>
+    <header className="student-dashboard-nav">
+      <NavLink to="/dashboard" className="student-course-back"><ArrowLeft aria-hidden="true" />{tx("All courses", "كل الدورات")}</NavLink>
+      <div className="student-dashboard-nav-actions">
+        <NavLink to="/profile" className="student-dashboard-profile-link" aria-label={tx("Student profile", "ملف الطالب")}><UserCircle aria-hidden="true" />{studentName && <span>{studentName}</span>}</NavLink>
+        <ThemeToggle />
+        <button type="button" onClick={() => { api.signOut(); location.assign("/"); }}>{tx("Exit Portal", "الخروج")}</button>
+      </div>
+    </header>
+    <main className="page-container dashboard-page lessons-portal-page course-page" id="main-content" tabIndex={-1}>
+      {loading ? <div className="lesson-grid">{[1, 2].map((i) => <div className="lesson-card skeleton" key={i} />)}</div> : error ? <div className="empty-state"><p>{error}</p></div> : !course ? <div className="empty-state"><h2>{tx("Course not found", "الدورة غير موجودة")}</h2><NavLink to="/dashboard">{tx("Back to courses", "العودة للدورات")}</NavLink></div> : <>
+        <div className="course-page-heading">
+          {course.image_url || course.image_path?.startsWith("data:image/") ? <img src={course.image_url || course.image_path} alt="" /> : <div className="student-course-image-empty"><BookOpen aria-hidden="true" /></div>}
+          <div><p className="eyebrow">{tx("COURSE", "الدورة")}</p><h1>{course.name}</h1>{course.description && <p>{course.description}</p>}</div>
+        </div>
+        <div className="section-title"><h2>{tx("Lessons", "الدروس")}</h2><span>{tx(`${course.lessons?.length ?? 0} lessons`, `${course.lessons?.length ?? 0} دروس`)}</span></div>
+        {course.lessons?.length ? <div className="lesson-grid">{course.lessons.map((lesson, index) => <DashboardLessonCard key={lesson.id} lesson={lesson} index={index} />)}</div> : <div className="empty-state"><p>{tx("No lessons are available in this course yet.", "لا توجد دروس متاحة في هذه الدورة بعد.")}</p></div>}
+      </>}
+    </main>
+  </Shell>;
 }

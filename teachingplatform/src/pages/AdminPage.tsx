@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { BookOpen, ClipboardText, DeviceMobile, DownloadSimple, LockKey, MonitorPlay, Plus, Trash, UserCircle, UsersThree, X } from "@phosphor-icons/react";
+import { BookOpen, ClipboardText, DeviceMobile, DownloadSimple, GraduationCap, Image, LockKey, MonitorPlay, PencilSimple, Plus, Trash, UserCircle, UsersThree, X } from "@phosphor-icons/react";
 import { api, isDemoMode, type StudentAnswer } from "../lib/api";
-import type { Lesson, Student } from "../types";
+import type { Course, Lesson, Student } from "../types";
 import { Shell } from "../context/LocaleContext";
 import { useLocale } from "../context/LocaleState";
 import { LessonBuilder } from "../components/LessonBuilder";
@@ -34,10 +34,11 @@ export function AdminPage() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
-  const [view, setView] = useState<"lessons" | "codes" | "students" | "answers">(() => lessonId ? "answers" : "lessons");
+  const [view, setView] = useState<"lessons" | "courses" | "codes" | "students" | "answers">(() => lessonId ? "answers" : "lessons");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() => window.matchMedia("(max-width: 820px)").matches);
   const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [portalLoading, setPortalLoading] = useState(true);
   const [portalError, setPortalError] = useState("");
@@ -53,6 +54,8 @@ export function AdminPage() {
   const [publishingLessonId, setPublishingLessonId] = useState("");
   const [deletingLessonId, setDeletingLessonId] = useState("");
   const [resettingStudentId, setResettingStudentId] = useState("");
+  const [deletingStudentId, setDeletingStudentId] = useState("");
+  const [assigningLessonId, setAssigningLessonId] = useState("");
   const [actionError, setActionError] = useState("");
   const [showLessonForm, setShowLessonForm] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
@@ -63,6 +66,16 @@ export function AdminPage() {
   });
   const [savingLesson, setSavingLesson] = useState(false);
   const [lessonError, setLessonError] = useState("");
+  const [showCourseForm, setShowCourseForm] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [courseDraft, setCourseDraft] = useState({ name: "", description: "", image_path: "" });
+  const [courseImageFile, setCourseImageFile] = useState<File | null>(null);
+  const [savingCourse, setSavingCourse] = useState(false);
+  const [courseError, setCourseError] = useState("");
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [studentCourseIds, setStudentCourseIds] = useState<string[]>([]);
+  const [savingStudent, setSavingStudent] = useState(false);
+  const [newLessonCourseId, setNewLessonCourseId] = useState("");
   useEffect(() => {
     const media = window.matchMedia("(max-width: 820px)");
     const updateViewport = () => setIsMobileViewport(media.matches);
@@ -74,11 +87,13 @@ export function AdminPage() {
     let active = true;
     setPortalLoading(true);
     setPortalError("");
-    Promise.all([api.adminLessons(), api.adminStudents()])
-      .then(([l, s]) => {
+    Promise.all([api.adminLessons(), api.adminStudents(), api.adminCourses()])
+      .then(([l, s, c]) => {
         if (!active) return;
         setLessons(l);
         setStudents(s);
+        setCourses(c);
+        setNewLessonCourseId((current) => current || c[0]?.id || "");
       })
       .catch((error) => {
         if (active) setPortalError(error instanceof Error ? error.message : "Could not load the teacher workspace.");
@@ -142,11 +157,11 @@ export function AdminPage() {
     );
   async function createLesson(e: React.FormEvent) {
     e.preventDefault();
-    if (!newLesson.title.trim()) return;
+    if (!newLesson.title.trim() || !newLessonCourseId) return;
     setSavingLesson(true);
     setLessonError("");
     try {
-      const l = await api.createLesson({ title: newLesson.title.trim(), description: newLesson.description.trim() });
+      const l = await api.createLesson({ title: newLesson.title.trim(), description: newLesson.description.trim(), course_id: newLessonCourseId });
       setLessons((v) => [...v, l]);
       setShowLessonForm(false);
       setNewLesson({ title: "", description: "", video_id: "" });
@@ -160,6 +175,49 @@ export function AdminPage() {
     } finally {
       setSavingLesson(false);
     }
+  }
+  async function saveCourse(e: React.FormEvent) {
+    e.preventDefault();
+    if (!courseDraft.name.trim()) return;
+    setSavingCourse(true); setCourseError(""); setActionError("");
+    try {
+      const image_path = courseImageFile ? await api.uploadCourseImage(courseImageFile) : courseDraft.image_path;
+      const saved = await api.saveCourse({ ...(editingCourse ? { id: editingCourse.id } : {}), ...courseDraft, image_path });
+      setCourses((items) => editingCourse ? items.map((course) => course.id === saved.id ? saved : course) : [...items, saved]);
+      setShowCourseForm(false); setEditingCourse(null); setCourseImageFile(null);
+    } catch (error) { setCourseError(error instanceof Error ? error.message : "The course could not be saved."); }
+    finally { setSavingCourse(false); }
+  }
+  async function moveLessonToCourse(lessonId: string, courseId: string) {
+    if (!courseId) return;
+    setAssigningLessonId(lessonId); setActionError("");
+    try {
+      const updated = await api.updateLesson(lessonId, { course_id: courseId });
+      if (!updated) throw new Error("The lesson could not be assigned.");
+      setLessons((items) => items.map((lesson) => lesson.id === lessonId ? updated as Lesson : lesson));
+    } catch (error) { setActionError(error instanceof Error ? error.message : "The lesson could not be assigned."); }
+    finally { setAssigningLessonId(""); }
+  }
+  async function saveStudentCourses(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingStudent) return;
+    setSavingStudent(true); setActionError("");
+    try {
+      await api.updateStudentCourses(editingStudent.id, studentCourseIds);
+      setStudents((items) => items.map((student) => student.id === editingStudent.id ? { ...student, course_ids: studentCourseIds } : student));
+      setEditingStudent(null);
+    } catch (error) { setActionError(error instanceof Error ? error.message : "Course access could not be updated."); }
+    finally { setSavingStudent(false); }
+  }
+  async function removeStudent(student: Student) {
+    if (!window.confirm(`Delete ${student.name}? Their quiz answers and lesson progress will also be removed.`)) return;
+    setDeletingStudentId(student.id); setActionError("");
+    try {
+      await api.deleteStudent(student.id);
+      setStudents((items) => items.filter((item) => item.id !== student.id));
+      setEditingStudent(null);
+    } catch (error) { setActionError(error instanceof Error ? error.message : "The student could not be deleted."); }
+    finally { setDeletingStudentId(""); }
   }
   return (
     <Shell admin onOpenAdminMenu={() => setMobileNavOpen(true)} adminMenuOpen={mobileNavOpen}>
@@ -177,6 +235,12 @@ export function AdminPage() {
               onClick={() => { setView("lessons"); navigate("/admin"); setMobileNavOpen(false); }}
             >
               <BookOpen /> {tx("Lessons", "الدروس")}
+            </button>
+            <button
+              className={view === "courses" ? "active" : ""}
+              onClick={() => { setView("courses"); navigate("/admin"); setMobileNavOpen(false); }}
+            >
+              <GraduationCap /> {tx("Courses", "الدورات")}
             </button>
             <button
               className={view === "codes" ? "active" : ""}
@@ -226,7 +290,7 @@ export function AdminPage() {
                 </div>
                 <button
                   className="primary-button"
-                  onClick={() => setShowLessonForm(true)}
+                  onClick={() => { setNewLessonCourseId(courses[0]?.id ?? ""); setShowLessonForm(true); }}
                 >
                   <Plus /> {tx("New lesson", "درس جديد")}
                 </button>
@@ -275,6 +339,38 @@ export function AdminPage() {
                   </div>
                 ))}
               </div>
+            </>
+          )}
+          {view === "courses" && (
+            <>
+              <div className="admin-title">
+                <div><p className="eyebrow">{tx("LEARNING PATHS", "مسارات التعلم")}</p><h1>{tx("Courses", "الدورات")}</h1><p>{tx("Create courses, add a cover image, and organize lessons into each course.", "أنشئ دورات وأضف صورة غلاف ونظّم الدروس داخل كل دورة.")}</p></div>
+                <button className="primary-button" onClick={() => { setEditingCourse(null); setCourseDraft({ name: "", description: "", image_path: "" }); setCourseImageFile(null); setCourseError(""); setShowCourseForm(true); }}><Plus /> {tx("New course", "دورة جديدة")}</button>
+              </div>
+              {courses.length ? <div className="course-admin-grid">
+                {courses.map((course) => {
+                  const courseLessons = lessons.filter((lesson) => lesson.course_id === course.id);
+                  const movableLessons = lessons.filter((lesson) => lesson.course_id !== course.id);
+                  return <article className="course-admin-card" key={course.id}>
+                    {course.image_url || course.image_path?.startsWith("data:image/") ? <img className="course-admin-image" src={course.image_url || course.image_path} alt="" /> : <div className="course-admin-image course-admin-image-empty"><Image aria-hidden="true" /></div>}
+                    <div className="course-admin-content">
+                      <div className="course-admin-heading"><div><h2>{course.name}</h2><p>{course.description || tx("No description yet.", "لا يوجد وصف بعد.")}</p></div>
+                        <div className="course-admin-actions"><button className="icon-button" aria-label={tx("Edit course", "تعديل الدورة")} onClick={() => { setEditingCourse(course); setCourseDraft({ name: course.name, description: course.description, image_path: course.image_path }); setCourseImageFile(null); setCourseError(""); setShowCourseForm(true); }}><PencilSimple /></button><button className="icon-button" aria-label={tx("Delete course", "حذف الدورة")} onClick={async () => { if (!window.confirm(`Delete course “${course.name}”?`)) return; setActionError(""); try { await api.deleteCourse(course.id); setCourses((items) => items.filter((item) => item.id !== course.id)); } catch (error) { setActionError(error instanceof Error ? error.message : "The course could not be deleted."); } }}><Trash /></button></div>
+                      </div>
+                      <div className="course-lesson-list"><strong>{courseLessons.length} {courseLessons.length === 1 ? tx("lesson", "درس") : tx("lessons", "دروس")}</strong>
+                        {courseLessons.map((lesson) => <div className="course-lesson-row" key={lesson.id}><span>{lesson.title}</span><span className={`publish-badge ${lesson.published ? "is-published" : ""}`}>{lesson.published ? tx("Published", "منشور") : tx("Draft", "مسودة")}</span></div>)}
+                        {!courseLessons.length && <p>{tx("No lessons in this course yet.", "لا توجد دروس في هذه الدورة بعد.")}</p>}
+                      </div>
+                      <label className="course-assign-select">{tx("Assign or move a lesson", "تعيين درس أو نقله")}
+                        <select value="" disabled={!movableLessons.length || Boolean(assigningLessonId)} onChange={(event) => { const lessonId = event.target.value; if (lessonId) void moveLessonToCourse(lessonId, course.id); }}>
+                          <option value="">{movableLessons.length ? tx("Choose a lesson…", "اختر درساً…") : tx("All lessons are here", "كل الدروس هنا")}</option>
+                          {movableLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.title} · {courses.find((item) => item.id === lesson.course_id)?.name ?? tx("Other course", "دورة أخرى")}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                  </article>;
+                })}
+              </div> : <div className="empty-state"><GraduationCap /><h3>{tx("Create your first course", "أنشئ دورتك الأولى")}</h3><p>{tx("Courses group lessons and control which students can open them.", "تجمع الدورات الدروس وتحدد الطلاب الذين يمكنهم فتحها.")}</p></div>}
             </>
           )}
           {view === "codes" && (
@@ -426,22 +522,16 @@ export function AdminPage() {
                         </>
                       )}
                     </span>
-                    <button
-                      className="text-button"
-                      disabled={resettingStudentId === s.id}
-                      aria-busy={resettingStudentId === s.id}
-                      onClick={async () => {
+                    <span className="student-row-actions">
+                      <button className="text-button" onClick={() => { setEditingStudent(s); setStudentCourseIds(s.course_ids ?? []); }}>{tx("Edit access", "تعديل الوصول")}</button>
+                      <button className="text-button" disabled={resettingStudentId === s.id} aria-busy={resettingStudentId === s.id} onClick={async () => {
                         setResettingStudentId(s.id); setActionError("");
-                        try {
-                          await api.resetDevice(s.id);
-                          setStudents((v) => v.map((x) => x.id === s.id ? { ...x, device_locked: false } : x));
-                        } catch (error) { setActionError(error instanceof Error ? error.message : "The device could not be reset."); }
+                        try { await api.resetDevice(s.id); setStudents((v) => v.map((x) => x.id === s.id ? { ...x, device_locked: false } : x)); }
+                        catch (error) { setActionError(error instanceof Error ? error.message : "The device could not be reset."); }
                         finally { setResettingStudentId(""); }
-                      }}
-                    >
-                      {resettingStudentId === s.id && <span className="ui-spinner" aria-hidden="true" />}
-                      {tx("Reset device", "إعادة ضبط الجهاز")}
-                    </button>
+                      }}>{resettingStudentId === s.id && <span className="ui-spinner" aria-hidden="true" />}{tx("Reset device", "إعادة ضبط الجهاز")}</button>
+                      <button className="text-button danger-button" disabled={deletingStudentId === s.id} onClick={() => void removeStudent(s)}>{deletingStudentId === s.id ? <span className="ui-spinner" aria-hidden="true" /> : <Trash />}{tx("Delete", "حذف")}</button>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -457,8 +547,31 @@ export function AdminPage() {
             <p>{tx("Start with a title. Add any content, sections, video, PDF, or questions later in the lesson editor.", "ابدأ بكتابة العنوان. يمكنك إضافة المحتوى والأقسام والفيديو وملفات PDF والأسئلة لاحقاً في محرر الدرس.")}</p>
             <label>{tx("Title", "العنوان")}<input required value={newLesson.title} onChange={(e) => setNewLesson({ ...newLesson, title: e.target.value })} placeholder={tx("e.g. Cell structure", "مثال: تركيب الخلية")} /></label>
             <label>{tx("Description (optional)", "الوصف (اختياري)")}<textarea value={newLesson.description} onChange={(e) => setNewLesson({ ...newLesson, description: e.target.value })} placeholder={tx("A short introduction for students", "مقدمة قصيرة للطلاب")} /></label>
+            <label>{tx("Course", "الدورة")}<select required value={newLessonCourseId} onChange={(event) => setNewLessonCourseId(event.target.value)}><option value="">{tx("Choose a course", "اختر دورة")}</option>{courses.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}</select></label>
             {lessonError && <p className="form-error"><X /> {lessonError}</p>}
             <div className="modal-actions"><button type="button" className="secondary-button" disabled={savingLesson} onClick={() => setShowLessonForm(false)}>{tx("Cancel", "إلغاء")}</button><button disabled={savingLesson} aria-busy={savingLesson} className="primary-button">{savingLesson && <span className="ui-spinner" aria-hidden="true" />}{savingLesson ? tx("Creating…", "جارٍ الإنشاء…") : tx("Create draft", "إنشاء مسودة")}</button></div>
+          </form>
+        </div>
+      )}
+      {showCourseForm && (
+        <div className="modal-backdrop" onMouseDown={() => !savingCourse && setShowCourseForm(false)}>
+          <form className="modal" onSubmit={saveCourse} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><p className="eyebrow">{tx("COURSE DETAILS", "تفاصيل الدورة")}</p><h2>{editingCourse ? tx("Edit course", "تعديل الدورة") : tx("Create a course", "إنشاء دورة")}</h2></div><button type="button" onClick={() => setShowCourseForm(false)} aria-label={tx("Close", "إغلاق")}><X /></button></div>
+            <label>{tx("Name", "الاسم")}<input required maxLength={120} value={courseDraft.name} onChange={(event) => setCourseDraft({ ...courseDraft, name: event.target.value })} /></label>
+            <label>{tx("Description", "الوصف")}<textarea maxLength={2000} value={courseDraft.description} onChange={(event) => setCourseDraft({ ...courseDraft, description: event.target.value })} placeholder={tx("What will students learn?", "ماذا سيتعلم الطلاب؟")} /></label>
+            <label>{tx("Course image", "صورة الدورة")}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setCourseImageFile(event.target.files?.[0] ?? null)} /><small>{courseImageFile?.name || (courseDraft.image_path ? tx("An image is already attached.", "هناك صورة مرفقة بالفعل.") : tx("JPEG, PNG, or WebP, up to 8 MB.", "JPEG أو PNG أو WebP، حتى 8 ميغابايت."))}</small></label>
+            {courseError && <p className="form-error"><X /> {courseError}</p>}
+            <div className="modal-actions"><button type="button" className="secondary-button" disabled={savingCourse} onClick={() => setShowCourseForm(false)}>{tx("Cancel", "إلغاء")}</button><button className="primary-button" disabled={savingCourse} aria-busy={savingCourse}>{savingCourse && <span className="ui-spinner" aria-hidden="true" />}{savingCourse ? tx("Saving…", "جارٍ الحفظ…") : tx("Save course", "حفظ الدورة")}</button></div>
+          </form>
+        </div>
+      )}
+      {editingStudent && (
+        <div className="modal-backdrop" onMouseDown={() => !savingStudent && setEditingStudent(null)}>
+          <form className="modal student-course-modal" onSubmit={saveStudentCourses} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><p className="eyebrow">{tx("STUDENT ACCESS", "دخول الطالب")}</p><h2>{tx(`Edit ${editingStudent.name}`, `تعديل ${editingStudent.name}`)}</h2></div><button type="button" onClick={() => setEditingStudent(null)} aria-label={tx("Close", "إغلاق")}><X /></button></div>
+            <p>{tx("Choose which courses this student can open. Access updates immediately after saving.", "اختر الدورات التي يمكن لهذا الطالب فتحها. يتم تحديث الوصول بعد الحفظ مباشرة.")}</p>
+            <div className="student-course-options">{courses.map((course) => <label key={course.id}><input type="checkbox" checked={studentCourseIds.includes(course.id)} onChange={(event) => setStudentCourseIds((current) => event.target.checked ? [...current, course.id] : current.filter((id) => id !== course.id))} /><span><strong>{course.name}</strong><small>{lessons.filter((lesson) => lesson.course_id === course.id).length} {tx("lessons", "دروس")}</small></span></label>)}</div>
+            <div className="student-modal-footer"><button type="button" className="text-button danger-button" disabled={savingStudent || deletingStudentId === editingStudent.id} onClick={() => void removeStudent(editingStudent)}>{tx("Delete student", "حذف الطالب")}</button><div className="modal-actions"><button type="button" className="secondary-button" disabled={savingStudent} onClick={() => setEditingStudent(null)}>{tx("Cancel", "إلغاء")}</button><button className="primary-button" disabled={savingStudent} aria-busy={savingStudent}>{savingStudent && <span className="ui-spinner" aria-hidden="true" />}{savingStudent ? tx("Saving…", "جارٍ الحفظ…") : tx("Save access", "حفظ الوصول")}</button></div></div>
           </form>
         </div>
       )}

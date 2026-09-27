@@ -1,8 +1,8 @@
 ﻿import { useEffect, useState } from "react";
 import { Navigate, NavLink, useNavigate } from "react-router-dom";
-import { ArrowRight, Clock, DeviceMobile, LockKey, X } from "@phosphor-icons/react";
+import { ArrowRight, BookOpen, Clock, DeviceMobile, LockKey, X } from "@phosphor-icons/react";
 import { api, isDemoMode } from "../lib/api";
-import type { Lesson } from "../types";
+import type { Course, Lesson } from "../types";
 import { Brand, Shell, ThemeToggle } from "../context/LocaleContext";
 import { useLocale } from "../context/LocaleState";
 import { useTheme } from "../context/ThemeState";
@@ -189,13 +189,13 @@ function DashboardLessonCard({ lesson, index }: { lesson: Lesson; index: number 
 export function Dashboard() {
   const { tx } = useLocale();
   const studentName = localStorage.getItem("lesson_portal_student_name")?.trim();
-  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   useEffect(() => {
     api
-      .getLessons()
-      .then(setLessons)
+      .getCourses()
+      .then(setCourses)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -219,8 +219,8 @@ export function Dashboard() {
           </div>
         </section>
         <div className="section-title">
-          <h2>{tx("Your lessons", "دروسك")}</h2>
-          <span>{tx(`${lessons.length} lessons`, `${lessons.length} دروس`)}</span>
+          <h2>{tx("Your courses", "دوراتك")}</h2>
+          <span>{tx(`${courses.reduce((total, course) => total + (course.lessons?.length ?? 0), 0)} lessons`, `${courses.reduce((total, course) => total + (course.lessons?.length ?? 0), 0)} دروس`)}</span>
         </div>
         {loading ? (
           <div className="lesson-grid">
@@ -234,10 +234,16 @@ export function Dashboard() {
             <p>{error}</p>
             <button onClick={() => location.reload()}>{tx("Try again", "حاول مجدداً")}</button>
           </div>
-        ) : (
-          <div className="lesson-grid">
-            {lessons.map((lesson, index) => <DashboardLessonCard key={lesson.id} lesson={lesson} index={index} />)}
+        ) : courses.length ? (
+          <div className="student-course-list">
+            {courses.map((course) => <section className="student-course" key={course.id}>
+              {course.image_url || course.image_path?.startsWith("data:image/") ? <img className="student-course-image" src={course.image_url || course.image_path} alt="" loading="lazy" /> : <div className="student-course-image student-course-image-empty"><BookOpen aria-hidden="true" /></div>}
+              <div className="student-course-heading"><h2>{course.name}</h2>{course.description && <p>{course.description}</p>}</div>
+              {course.lessons?.length ? <div className="lesson-grid">{course.lessons.map((lesson, index) => <DashboardLessonCard key={lesson.id} lesson={lesson} index={index} />)}</div> : <p className="student-course-empty">{tx("No lessons are available in this course yet.", "لا توجد دروس متاحة في هذه الدورة بعد.")}</p>}
+            </section>)}
           </div>
+        ) : (
+          <div className="empty-state"><h3>{tx("No courses assigned yet", "لم يتم تعيين دورات بعد")}</h3><p>{tx("Ask your teacher to give you access to a course.", "اطلب من معلمك منحك صلاحية الوصول إلى دورة.")}</p></div>
         )}
       </main>
     </Shell>

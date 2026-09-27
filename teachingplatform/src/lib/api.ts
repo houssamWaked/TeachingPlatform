@@ -1,12 +1,17 @@
 import { demoLessons, demoStudents } from "../data/demo";
-import type { Lesson, Question, Student } from "../types";
+import type { Course, Lesson, Question, Student } from "../types";
 import { getDeviceFingerprint } from "./device";
 
 const base = import.meta.env.VITE_API_BASE_URL as string | undefined;
 export const isDemoMode = !base;
 const SESSION = "lesson_portal_session_hint";
 const progressKey = "lesson_portal_demo_progress";
+const DEMO_COURSE_ID = "demo-course-general";
+const demoCoursesKey = "lesson_portal_demo_courses";
+const demoStudentCoursesKey = "lesson_portal_demo_student_courses";
+const demoDeletedStudentsKey = "lesson_portal_demo_deleted_students";
 export type StudentAnswer = { id: string; student_id: string; student_name: string; question_id: string; question_text: string; question_type: "text" | "multiple_choice"; answer_text: string; submitted_at: string };
+export type StudentProfile = { name: string; photo_url: string };
 const lessonHasDocument = (lesson: Lesson) => Boolean(lesson.pdf_path || lesson.word_path || [
   ...(lesson.content?.blocks ?? []),
   ...(lesson.content?.sections ?? []).flatMap((section) => section.blocks),
@@ -30,6 +35,38 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return data;
 }
 
+async function requestForm<T>(path: string, form: FormData): Promise<T> {
+  const device = await getDeviceFingerprint();
+  const response = await fetch(`${base}${path}`, {
+    method: "POST", credentials: "include",
+    headers: { "x-device-id": device.clientId, "x-device-fingerprint": device.fingerprint },
+    body: form,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Something went wrong.");
+  return data;
+}
+
+function loadDemoCourses(): Course[] {
+  const saved = JSON.parse(localStorage.getItem(demoCoursesKey) || "[]") as Course[];
+  return saved.length ? saved : [{ id: DEMO_COURSE_ID, name: "General", description: "Existing lessons and student access", image_path: "" }];
+}
+
+function loadDemoStudentCourses(): Record<string, string[]> {
+  return JSON.parse(localStorage.getItem(demoStudentCoursesKey) || "{}") as Record<string, string[]>;
+}
+
+function loadDemoStudents(): Student[] {
+  const deleted = new Set(JSON.parse(localStorage.getItem(demoDeletedStudentsKey) || "[]") as string[]);
+  const assignments = loadDemoStudentCourses();
+  const studentName = localStorage.getItem("lesson_portal_student_name");
+  return demoStudents.filter((student) => !deleted.has(student.id)).map((student) => ({
+    ...student,
+    ...(student.code === "LESSON26" && studentName ? { name: studentName } : {}),
+    course_ids: assignments[student.id] ?? [DEMO_COURSE_ID],
+  }));
+}
+
 function loadLessons() {
   const stored = JSON.parse(
     localStorage.getItem(progressKey) || "{}",
@@ -49,6 +86,8 @@ function loadLessons() {
     ].filter(Boolean).length;
     return {
       ...lesson,
+      course_id: lesson.course_id || DEMO_COURSE_ID,
+      course_name: lesson.course_name || loadDemoCourses().find((course) => course.id === (lesson.course_id || DEMO_COURSE_ID))?.name || "General",
       progress,
       progressPercent: progress.manual_completed ? 100 : Math.round((count / Math.max(1, [lesson.video_id, lessonHasDocument(lesson), lesson.questions?.length].filter(Boolean).length)) * 100),
       status: progress.manual_completed || (count > 0 && count >= [lesson.video_id, lessonHasDocument(lesson), lesson.questions?.length].filter(Boolean).length) ? "completed" : count ? "in_progress" : "not_started",
@@ -88,14 +127,42 @@ export const api = {
   async getLessons(): Promise<Lesson[]> {
     if (isDemoMode) {
       await delay();
-      return loadLessons().filter((lesson) => lesson.published !== false);
+      const assigned = new Set(loadDemoStudents().find((student) => student.code === localStorage.getItem("lesson_portal_student_code"))?.course_ids ?? []);
+      return loadLessons().filter((lesson) => lesson.published !== false && assigned.has(lesson.course_id));
     }
     return request("/lessons");
+  },
+  async getCourses(): Promise<Course[]> {
+    if (!isDemoMode) return request<Course[]>("/courses");
+    await delay();
+    const assigned = new Set(loadDemoStudents().find((student) => student.code === localStorage.getItem("lesson_portal_student_code"))?.course_ids ?? []);
+    return loadDemoCourses().filter((course) => assigned.has(course.id)).map((course) => ({
+      ...course,
+      lessons: loadLessons().filter((lesson) => lesson.published !== false && lesson.course_id === course.id),
+    }));
+  },
+  async studentProfile(): Promise<StudentProfile> {
+    if (isDemoMode) return { name: localStorage.getItem("lesson_portal_student_name") || "Student", photo_url: localStorage.getItem("lesson_portal_student_photo") || "" };
+    return request<StudentProfile>("/student/profile");
+  },
+  async updateStudentProfile(name: string, photo?: File): Promise<StudentProfile> {
+    if (isDemoMode) {
+      const studentName = name.trim().replace(/\s+/g, " ");
+      if (!studentName) throw new Error("Enter your name.");
+      localStorage.setItem("lesson_portal_student_name", studentName);
+      if (photo) localStorage.setItem("lesson_portal_student_photo", await api.readImage(photo));
+      return api.studentProfile();
+    }
+    const form = new FormData();
+    form.append("name", name);
+    if (photo) form.append("photo", photo);
+    return requestForm<StudentProfile>("/student/profile", form);
   },
   async getLesson(id: string): Promise<Lesson> {
     if (isDemoMode) {
       await delay(120);
-      const lesson = loadLessons().find((item) => item.id === id && item.published !== false);
+      const assigned = new Set(loadDemoStudents().find((student) => student.code === localStorage.getItem("lesson_portal_student_code"))?.course_ids ?? []);
+      const lesson = loadLessons().find((item) => item.id === id && item.published !== false && assigned.has(item.course_id));
       if (!lesson) throw new Error("Lesson not found");
       return lesson;
     }
@@ -196,10 +263,56 @@ export const api = {
   },
   async adminStudents() {
     if (!isDemoMode) return request<Student[]>("/admin/students");
-    const studentName = localStorage.getItem("lesson_portal_student_name");
-    return demoStudents.map((student) => student.code === "LESSON26" && studentName
-      ? { ...student, name: studentName }
-      : student);
+    return loadDemoStudents();
+  },
+  async adminCourses(): Promise<Course[]> {
+    if (isDemoMode) return loadDemoCourses().map((course) => ({ ...course }));
+    return request<Course[]>("/admin/courses");
+  },
+  async saveCourse(data: { id?: string; name: string; description: string; image_path: string }): Promise<Course> {
+    if (isDemoMode) {
+      await delay();
+      const courses = loadDemoCourses();
+      const saved: Course = { ...data, id: data.id ?? crypto.randomUUID() };
+      localStorage.setItem(demoCoursesKey, JSON.stringify(data.id ? courses.map((course) => course.id === data.id ? saved : course) : [...courses, saved]));
+      return saved;
+    }
+    return request<Course>(data.id ? `/admin/courses/${data.id}` : "/admin/courses", {
+      method: data.id ? "PATCH" : "POST", body: JSON.stringify(data),
+    });
+  },
+  async deleteCourse(id: string) {
+    if (isDemoMode) {
+      if (loadLessons().some((lesson) => lesson.course_id === id)) throw new Error("Move this course’s lessons before deleting it.");
+      localStorage.setItem(demoCoursesKey, JSON.stringify(loadDemoCourses().filter((course) => course.id !== id)));
+      return;
+    }
+    return request(`/admin/courses/${id}`, { method: "DELETE" });
+  },
+  async uploadCourseImage(file: File): Promise<string> {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Choose a JPEG, PNG, or WebP image.");
+    if (file.size > 8 * 1024 * 1024) throw new Error("Images must be 8 MB or smaller.");
+    if (isDemoMode) return api.readImage(file);
+    const form = new FormData(); form.append("file", file);
+    return (await requestForm<{ path: string }>("/admin/course-images", form)).path;
+  },
+  async updateStudentCourses(id: string, course_ids: string[]) {
+    if (isDemoMode) {
+      const assignments = loadDemoStudentCourses();
+      assignments[id] = course_ids;
+      localStorage.setItem(demoStudentCoursesKey, JSON.stringify(assignments));
+      return;
+    }
+    return request(`/admin/students/${id}/courses`, { method: "PUT", body: JSON.stringify({ course_ids }) });
+  },
+  async deleteStudent(id: string) {
+    if (isDemoMode) {
+      const deleted = new Set(JSON.parse(localStorage.getItem(demoDeletedStudentsKey) || "[]") as string[]);
+      deleted.add(id);
+      localStorage.setItem(demoDeletedStudentsKey, JSON.stringify([...deleted]));
+      return;
+    }
+    return request(`/admin/students/${id}`, { method: "DELETE" });
   },
   async adminAnswers(lessonId: string): Promise<StudentAnswer[]> {
     if (isDemoMode) {
@@ -276,6 +389,14 @@ export const api = {
     if (!response.ok) throw new Error(data.error || "Image upload failed.");
     return data.path as string;
   },
+  async readImage(file: File): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Could not read image file."));
+      reader.onerror = () => reject(new Error("Could not read image file."));
+      reader.readAsDataURL(file);
+    });
+  },
   async lessonImageUrl(id: string, imagePath: string, admin = false) {
     if (isDemoMode) return null;
     const query = new URLSearchParams({ path: imagePath });
@@ -330,6 +451,7 @@ export const api = {
   async createLesson(data: {
     title: string;
     description: string;
+    course_id: string;
   }): Promise<Lesson> {
     if (isDemoMode) {
       await delay();
@@ -361,7 +483,7 @@ export const api = {
       body: JSON.stringify(data),
     });
   },
-  async updateLesson(id: string, data: Partial<Pick<Lesson, "title" | "description" | "video_id" | "pdf_path" | "word_path" | "content" | "published">>) {
+  async updateLesson(id: string, data: Partial<Pick<Lesson, "title" | "description" | "video_id" | "pdf_path" | "word_path" | "content" | "published" | "course_id">>) {
     if (isDemoMode) {
       await delay();
       const lessons = loadLessons();

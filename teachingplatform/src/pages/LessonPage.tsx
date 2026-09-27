@@ -1,7 +1,7 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, BookOpen, CheckCircle, ClipboardText, FilePdf, List, VideoCamera, X } from "@phosphor-icons/react";
-import { api } from "../lib/api";
+import { ArrowLeft, ArrowRight, BookOpen, CheckCircle, ClipboardText, FilePdf, List, UserCircle, VideoCamera, X } from "@phosphor-icons/react";
+import { api, type StudentProfile } from "../lib/api";
 import type { Lesson } from "../types";
 import { Shell, ThemeToggle } from "../context/LocaleContext";
 import { useLocale } from "../context/LocaleState";
@@ -81,6 +81,36 @@ function useCaptureProtection(lessonId: string) {
   return { captureActive, captureMessage, shortcutCoverActive };
 }
 
+function StudentProfileDialog({ profile, onClose, onSaved }: { profile: StudentProfile; onClose: () => void; onSaved: (profile: StudentProfile) => void }) {
+  const { tx } = useLocale();
+  const [name, setName] = useState(profile.name);
+  const [photo, setPhoto] = useState<File | undefined>();
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState(profile.photo_url);
+  useEffect(() => {
+    if (!photo) { setPreview(profile.photo_url); return; }
+    const url = URL.createObjectURL(photo);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photo, profile.photo_url]);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault(); setError(""); setSaving(true);
+    try { onSaved(await api.updateStudentProfile(name, photo)); onClose(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Your profile could not be updated."); }
+    finally { setSaving(false); }
+  }
+  return <div className="modal-backdrop profile-modal-backdrop" onMouseDown={() => !saving && onClose()}>
+    <form className="modal student-profile-modal" onSubmit={submit} onMouseDown={(event) => event.stopPropagation()}>
+      <div className="modal-head"><div><p className="eyebrow">{tx("YOUR ACCOUNT", "حسابك")}</p><h2>{tx("Student profile", "ملف الطالب")}</h2></div><button type="button" onClick={onClose} aria-label={tx("Close", "إغلاق")}><X /></button></div>
+      <div className="student-profile-photo"><div>{preview ? <img src={preview} alt="" /> : <UserCircle aria-hidden="true" />}</div><label className="secondary-button">{tx("Change photo", "تغيير الصورة")}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setPhoto(event.target.files?.[0])} /></label></div>
+      <label>{tx("Name", "الاسم")}<input required maxLength={80} value={name} onChange={(event) => setName(event.target.value)} /></label>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <div className="modal-actions"><button type="button" className="secondary-button" disabled={saving} onClick={onClose}>{tx("Cancel", "إلغاء")}</button><button className="primary-button" disabled={saving} aria-busy={saving}>{saving && <span className="ui-spinner" aria-hidden="true" />}{saving ? tx("Saving…", "جارٍ الحفظ…") : tx("Save profile", "حفظ الملف")}</button></div>
+    </form>
+  </div>;
+}
+
 // ---------------------------------------------------------------------------
 // Small pure helpers
 // ---------------------------------------------------------------------------
@@ -110,6 +140,8 @@ export function LessonPage() {
   const navigate = useNavigate();
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [profile, setProfile] = useState<StudentProfile>(() => ({ name: localStorage.getItem("lesson_portal_student_name") || "Student", photo_url: localStorage.getItem("lesson_portal_student_photo") || "" }));
+  const [profileOpen, setProfileOpen] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<"content" | "quiz">("content");
   const [activeLessonTab, setActiveLessonTab] = useState("");
@@ -123,6 +155,17 @@ export function LessonPage() {
   );
 
   const { captureActive, captureMessage, shortcutCoverActive } = useCaptureProtection(id);
+
+  useEffect(() => {
+    let active = true;
+    api.studentProfile().then((current) => {
+      if (!active) return;
+      setProfile(current);
+      localStorage.setItem("lesson_portal_student_name", current.name);
+      if (current.photo_url) localStorage.setItem("lesson_portal_student_photo", current.photo_url);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     setLesson(null);
@@ -212,6 +255,10 @@ export function LessonPage() {
             <span className="lesson-header-divider" aria-hidden="true" />
             <h1 title={lesson.title}>{lesson.title}</h1>
           </div>
+          <button type="button" className="lesson-profile-button" onClick={() => setProfileOpen(true)}>
+            {profile.photo_url ? <img src={profile.photo_url} alt="" /> : <UserCircle aria-hidden="true" />}
+            <span>{tx("Profile", "الملف الشخصي")}</span>
+          </button>
           <ThemeToggle />
           <button type="button" className="lesson-exit-button" onClick={() => navigate("/dashboard")}>{tx("Exit Portal", "الخروج")}</button>
         </header>
@@ -357,6 +404,11 @@ export function LessonPage() {
             </div>
           </div>
         </div>
+        {profileOpen && <StudentProfileDialog profile={profile} onClose={() => setProfileOpen(false)} onSaved={(next) => {
+          setProfile(next);
+          localStorage.setItem("lesson_portal_student_name", next.name);
+          if (next.photo_url) localStorage.setItem("lesson_portal_student_photo", next.photo_url);
+        }} />}
       </main>
     </Shell>
   );

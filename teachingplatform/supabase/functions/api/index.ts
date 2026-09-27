@@ -86,6 +86,29 @@ const lessonHasContentDocument = (content: unknown): boolean => {
 };
 const lessonHasDocument = (lesson: Record<string, unknown>, documentPath: string) =>
   lesson.pdf_path === documentPath || lesson.word_path === documentPath || lessonReferencesDocument(lesson.content, documentPath);
+const validImageType = (file: File) => ({
+  "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+} as Record<string, string>)[file.type];
+const signedCourse = async (course: Record<string, unknown>) => {
+  const imagePath = typeof course.image_path === "string" ? course.image_path : "";
+  if (!imagePath) return { ...course, image_url: "" };
+  const { data, error } = await db.storage.from("lesson-pdfs").createSignedUrl(imagePath, 300);
+  if (error) throw error;
+  return { ...course, image_url: data.signedUrl };
+};
+const studentCanAccessLesson = async (studentId: string, lessonId: string) => {
+  const { data: lesson, error: lessonError } = await db.from("lessons").select("course_id").eq("id", lessonId).eq("published", true).maybeSingle();
+  if (lessonError) throw lessonError;
+  if (!lesson) return false;
+  const { data: assignment, error } = await db.from("student_courses").select("student_id").eq("student_id", studentId).eq("course_id", lesson.course_id).maybeSingle();
+  if (error) throw error;
+  return Boolean(assignment);
+};
+const studentCourseIds = async (studentId: string) => {
+  const { data, error } = await db.from("student_courses").select("course_id").eq("student_id", studentId);
+  if (error) throw error;
+  return (data ?? []).map((row) => row.course_id as string);
+};
 const lessonHasVideo = (lesson: Record<string, unknown>, videoId: string) => {
   if (lesson.video_id === videoId) return true;
   const visit = (value: unknown): boolean => {
@@ -357,6 +380,65 @@ Deno.serve(async (req) => {
         if (error) throw error;
         return json({ path: imagePath }, 201);
       }
+      if (path === "/admin/course-images" && req.method === "POST") {
+        const form = await req.formData();
+        const file = form.get("file");
+        if (!(file instanceof File)) return fail("Choose a course image.");
+        const extension = validImageType(file);
+        if (!extension) return fail("Images must be JPEG, PNG, or WebP.");
+        if (file.size > 8 * 1024 * 1024) return fail("Images must be 8 MB or smaller.");
+        const imagePath = `courses/images/${crypto.randomUUID()}.${extension}`;
+        const { error } = await db.storage.from("lesson-pdfs").upload(imagePath, file, { contentType: file.type, upsert: false });
+        if (error) throw error;
+        return json({ path: imagePath }, 201);
+      }
+      if (path === "/admin/courses" && req.method === "GET") {
+        const { data, error } = await db.from("courses").select("id,name,description,image_path").order("name");
+        if (error) throw error;
+        return json(await Promise.all((data ?? []).map((course) => signedCourse(course))));
+      }
+      if (path === "/admin/courses" && req.method === "POST") {
+        const body = await req.json();
+        const name = typeof body.name === "string" ? body.name.trim() : "";
+        const description = typeof body.description === "string" ? body.description.trim() : "";
+        const imagePath = typeof body.image_path === "string" ? body.image_path : "";
+        if (!name || name.length > 120) return fail("Course name must be 1–120 characters.");
+        if (description.length > 2000) return fail("Course description must be 2,000 characters or fewer.");
+        if (imagePath && !/^courses\/images\/[a-f0-9-]+\.(jpg|png|webp)$/i.test(imagePath)) return fail("Invalid course image path.");
+        const { data, error } = await db.from("courses").insert({ name, description, image_path: imagePath }).select("id,name,description,image_path").single();
+        if (error) throw error;
+        return json(await signedCourse(data), 201);
+      }
+      const courseRoute = path.match(/^\/admin\/courses\/([0-9a-f-]+)$/i);
+      if (courseRoute && req.method === "PATCH") {
+        const body = await req.json();
+        const update: Record<string, string> = {};
+        if (typeof body.name === "string") {
+          const name = body.name.trim();
+          if (!name || name.length > 120) return fail("Course name must be 1–120 characters.");
+          update.name = name;
+        }
+        if (typeof body.description === "string") {
+          const description = body.description.trim();
+          if (description.length > 2000) return fail("Course description must be 2,000 characters or fewer.");
+          update.description = description;
+        }
+        if (typeof body.image_path === "string") {
+          if (body.image_path && !/^courses\/images\/[a-f0-9-]+\.(jpg|png|webp)$/i.test(body.image_path)) return fail("Invalid course image path.");
+          update.image_path = body.image_path;
+        }
+        const { data, error } = await db.from("courses").update(update).eq("id", courseRoute[1]).select("id,name,description,image_path").single();
+        if (error) throw error;
+        return json(await signedCourse(data));
+      }
+      if (courseRoute && req.method === "DELETE") {
+        const { count, error: countError } = await db.from("lessons").select("id", { count: "exact", head: true }).eq("course_id", courseRoute[1]);
+        if (countError) throw countError;
+        if ((count ?? 0) > 0) return fail("Move this course’s lessons before deleting it.", 409);
+        const { error } = await db.from("courses").delete().eq("id", courseRoute[1]);
+        if (error) throw error;
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
       if (path === "/admin/lessons" && req.method === "GET") {
         const { data, error } = await db
           .from("lessons")
@@ -367,6 +449,7 @@ Deno.serve(async (req) => {
       }
       if (path === "/admin/lessons" && req.method === "POST") {
         const body = await req.json();
+        if (typeof body.course_id !== "string" || !/^[0-9a-f-]{36}$/i.test(body.course_id)) return fail("Choose a course for this lesson.");
         const { data: lastLesson, error: orderError } = await db
           .from("lessons")
           .select("order_index")
@@ -384,6 +467,7 @@ Deno.serve(async (req) => {
             word_path: "",
             content: { blocks: [], sections: [] },
             published: false,
+            course_id: body.course_id,
             order_index: (lastLesson?.order_index ?? 0) + 1,
           })
           .select("*,questions(*)")
@@ -444,6 +528,7 @@ Deno.serve(async (req) => {
         if (typeof body.pdf_path === "string") update.pdf_path = body.pdf_path;
         if (typeof body.word_path === "string") update.word_path = body.word_path;
         if (typeof body.published === "boolean") update.published = body.published;
+        if (typeof body.course_id === "string" && /^[0-9a-f-]{36}$/i.test(body.course_id)) update.course_id = body.course_id;
         if (body.content && typeof body.content === "object") update.content = body.content;
         const { data, error } = await db
           .from("lessons")
@@ -483,7 +568,7 @@ Deno.serve(async (req) => {
         const { data, error } = await db
           .from("students")
           .select(
-            "id,name,device_id,codes!students_code_id_fkey(code),progress(questions_completed)",
+            "id,name,device_id,codes!students_code_id_fkey(code),progress(questions_completed),student_courses(course_id)",
           );
         if (error) throw error;
         return json(
@@ -492,12 +577,29 @@ Deno.serve(async (req) => {
             name: s.name,
             code: (s.codes as { code: string })?.code,
             device_locked: Boolean(s.device_id),
+            course_ids: (s.student_courses as { course_id: string }[] | null)?.map((assignment) => assignment.course_id) ?? [],
             completed:
               (s.progress as { questions_completed: boolean }[])?.filter(
                 (p) => p.questions_completed,
               ).length ?? 0,
           })),
         );
+      }
+      const studentRoute = path.match(/^\/admin\/students\/([0-9a-f-]+)$/i);
+      if (studentRoute && req.method === "DELETE") {
+        const { error: codeError } = await db.from("codes").update({ is_used: false, used_by: null }).eq("used_by", studentRoute[1]);
+        if (codeError) throw codeError;
+        const { error } = await db.from("students").delete().eq("id", studentRoute[1]);
+        if (error) throw error;
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
+      const studentCoursesRoute = path.match(/^\/admin\/students\/([0-9a-f-]+)\/courses$/i);
+      if (studentCoursesRoute && req.method === "PUT") {
+        const body = await req.json();
+        if (!Array.isArray(body.course_ids) || body.course_ids.length > 100 || body.course_ids.some((id: unknown) => typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id))) return fail("Choose up to 100 valid courses.");
+        const { error } = await db.rpc("set_student_courses", { p_student_id: studentCoursesRoute[1], p_course_ids: body.course_ids });
+        if (error) throw error;
+        return json({ ok: true });
       }
       const lessonAnswers = path.match(/^\/admin\/lessons\/([^/]+)\/answers\/?$/);
       if (lessonAnswers && req.method === "GET") {
@@ -537,11 +639,47 @@ Deno.serve(async (req) => {
     }
 
     const student = await requireStudent(req);
+    if (path === "/student/profile" && req.method === "GET") {
+      const { data: profile, error } = await db.from("students").select("name,profile_image_path").eq("id", student.id).single();
+      if (error) throw error;
+      let photoUrl = "";
+      if (profile.profile_image_path) {
+        const { data: signed, error: signError } = await db.storage.from("lesson-pdfs").createSignedUrl(profile.profile_image_path, 300);
+        if (signError) throw signError;
+        photoUrl = signed.signedUrl;
+      }
+      return json({ name: profile.name, photo_url: photoUrl });
+    }
+    if (path === "/student/profile" && req.method === "POST") {
+      const form = await req.formData();
+      const name = String(form.get("name") ?? "").replace(/\s+/g, " ").trim();
+      if (!name || name.length > 80) return fail("Name must be 1–80 characters.");
+      const update: Record<string, string> = { name };
+      const photo = form.get("photo");
+      if (photo instanceof File && photo.size > 0) {
+        const extension = validImageType(photo);
+        if (!extension) return fail("Profile photos must be JPEG, PNG, or WebP.");
+        if (photo.size > 5 * 1024 * 1024) return fail("Profile photos must be 5 MB or smaller.");
+        const photoPath = `students/images/${crypto.randomUUID()}.${extension}`;
+        const { error: uploadError } = await db.storage.from("lesson-pdfs").upload(photoPath, photo, { contentType: photo.type, upsert: false });
+        if (uploadError) throw uploadError;
+        update.profile_image_path = photoPath;
+      }
+      const { data: profile, error } = await db.from("students").update(update).eq("id", student.id).select("name,profile_image_path").single();
+      if (error) throw error;
+      let photoUrl = "";
+      if (profile.profile_image_path) {
+        const { data: signed, error: signError } = await db.storage.from("lesson-pdfs").createSignedUrl(profile.profile_image_path, 300);
+        if (signError) throw signError;
+        photoUrl = signed.signedUrl;
+      }
+      return json({ name: profile.name, photo_url: photoUrl });
+    }
     const watermark = path.match(/^\/lessons\/([0-9a-f-]+)\/watermark$/);
     if (watermark && req.method === "POST") {
       const { data: lesson, error } = await db.from("lessons").select("id").eq("id", watermark[1]).eq("published", true).maybeSingle();
       if (error) throw error;
-      if (!lesson) return fail("Lesson not found.", 404);
+      if (!lesson || !await studentCanAccessLesson(student.id, watermark[1])) return fail("Lesson not found.", 404);
       const secret = Deno.env.get("FORENSIC_WATERMARK_SECRET");
       if (!secret) return fail("Forensic watermarking is not configured.", 503);
       const randomId = hex(crypto.getRandomValues(new Uint8Array(6))).toUpperCase();
@@ -559,14 +697,33 @@ Deno.serve(async (req) => {
       if (!allowed.has(body.capture_type) || typeof body.lesson_id !== "string") return fail("Invalid capture event.");
       const { data: lesson, error: lessonError } = await db.from("lessons").select("id").eq("id", body.lesson_id).eq("published", true).maybeSingle();
       if (lessonError) throw lessonError;
-      if (!lesson) return fail("Lesson not found.", 404);
+      if (!lesson || !await studentCanAccessLesson(student.id, body.lesson_id)) return fail("Lesson not found.", 404);
       const { error } = await db.from("capture_events").insert({ student_id: student.id, lesson_id: lesson.id, platform: "web", capture_type: body.capture_type, capture_state: String(body.capture_state ?? "UNKNOWN").slice(0, 40), response: String(body.response ?? "NONE").slice(0, 80) });
       if (error) throw error;
       return json({ ok: true }, 201);
     }
+    if (path === "/courses" && req.method === "GET") {
+      const courseIds = await studentCourseIds(student.id);
+      if (!courseIds.length) return json([]);
+      const [{ data: courses, error: courseError }, { data: lessons, error: lessonError }, { data: progress, error: progressError }] = await Promise.all([
+        db.from("courses").select("id,name,description,image_path").in("id", courseIds).order("name"),
+        db.from("lessons").select("*,questions(id,question_text,question_type,options)").in("course_id", courseIds).eq("published", true).order("order_index"),
+        db.from("progress").select("*").eq("student_id", student.id),
+      ]);
+      if (courseError) throw courseError;
+      if (lessonError) throw lessonError;
+      if (progressError) throw progressError;
+      const shapedLessons = (lessons ?? []).map((lesson) => lessonShape(lesson, (progress ?? []).find((item) => item.lesson_id === lesson.id)));
+      return json(await Promise.all((courses ?? []).map(async (course) => ({
+        ...await signedCourse(course),
+        lessons: shapedLessons.filter((lesson) => lesson.course_id === course.id),
+      }))));
+    }
     if (path === "/lessons" && req.method === "GET") {
+      const courseIds = await studentCourseIds(student.id);
+      if (!courseIds.length) return json([]);
       const [{ data: lessons, error }, { data: progress }] = await Promise.all([
-        db.from("lessons").select("*,questions(id,question_text,question_type,options)").eq("published", true).order("order_index"),
+        db.from("lessons").select("*,questions(id,question_text,question_type,options)").in("course_id", courseIds).eq("published", true).order("order_index"),
         db.from("progress").select("*").eq("student_id", student.id),
       ]);
       if (error) throw error;
@@ -581,6 +738,7 @@ Deno.serve(async (req) => {
     }
     const lessonId = path.match(/^\/lessons\/([0-9a-f-]+)$/);
     if (lessonId && req.method === "GET") {
+      if (!await studentCanAccessLesson(student.id, lessonId[1])) return fail("Lesson not found.", 404);
       const [{ data: lesson, error }, { data: progress }] = await Promise.all([
         db
           .from("lessons")
@@ -600,6 +758,7 @@ Deno.serve(async (req) => {
     }
     const lessonDocument = path.match(/^\/lessons\/([0-9a-f-]+)\/document$/);
     if (lessonDocument && req.method === "GET") {
+      if (!await studentCanAccessLesson(student.id, lessonDocument[1])) return fail("Lesson not found.", 404);
       const documentPath = new URL(req.url).searchParams.get("path") ?? "";
       const { data: lesson, error } = await db.from("lessons")
         .select("content,pdf_path,word_path")
@@ -614,6 +773,7 @@ Deno.serve(async (req) => {
     }
     const pdf = path.match(/^\/lessons\/([0-9a-f-]+)\/pdf$/);
     if (pdf && req.method === "GET") {
+      if (!await studentCanAccessLesson(student.id, pdf[1])) return fail("Lesson not found.", 404);
       const { data: lesson, error } = await db
         .from("lessons")
         .select("pdf_path")
@@ -630,6 +790,7 @@ Deno.serve(async (req) => {
     }
     const word = path.match(/^\/lessons\/([0-9a-f-]+)\/word$/);
     if (word && req.method === "GET") {
+      if (!await studentCanAccessLesson(student.id, word[1])) return fail("Lesson not found.", 404);
       const { data: lesson, error } = await db
         .from("lessons")
         .select("word_path")
@@ -646,6 +807,7 @@ Deno.serve(async (req) => {
     }
     const lessonImage = path.match(/^\/lessons\/([0-9a-f-]+)\/image$/);
     if (lessonImage && req.method === "GET") {
+      if (!await studentCanAccessLesson(student.id, lessonImage[1])) return fail("Lesson not found.", 404);
       const imagePath = new URL(req.url).searchParams.get("path") ?? "";
       const { data: lesson, error } = await db.from("lessons").select("content").eq("id", lessonImage[1]).eq("published", true).single();
       if (error) throw error;
@@ -656,6 +818,7 @@ Deno.serve(async (req) => {
     }
     if (path === "/submit-answers" && req.method === "POST") {
       const { lesson_id, answers } = await req.json();
+      if (typeof lesson_id !== "string" || !await studentCanAccessLesson(student.id, lesson_id)) return fail("Lesson not found.", 404);
       if (!Array.isArray(answers) || answers.length === 0)
         return fail("Answer at least one quiz question.");
       const qids = (answers ?? []).map(
@@ -687,6 +850,7 @@ Deno.serve(async (req) => {
     }
     const video = path.match(/^\/lessons\/([0-9a-f-]+)\/video-url$/);
     if (video && req.method === "POST") {
+      if (!await studentCanAccessLesson(student.id, video[1])) return fail("Lesson not found.", 404);
       const { data: lesson, error } = await db
         .from("lessons")
         .select("video_id,content")

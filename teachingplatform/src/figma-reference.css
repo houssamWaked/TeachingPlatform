@@ -1229,17 +1229,28 @@ html[data-theme="dark"] .course-student-row { border-color: #343a44; }
 @media (max-width: 700px) {
   .course-admin-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
   .course-admin-card-compact .course-admin-image { height: 160px; }
-  .course-detail-cover { grid-template-columns: 96px minmax(0, 1fr); gap: 14px; padding: 14px; }
-  .course-detail-cover > img, .course-detail-cover > .course-admin-image-empty { width: 96px; height: 84px; }
-  .course-detail-section { padding: 15px; }
-  .course-detail-section-heading { align-items: flex-start; }
-  .course-detail-section-heading .primary-button { min-height: 40px; padding: 9px 12px; font-size: 12px; }
+  .course-detail-title { align-items: stretch; gap: 10px; width: 100%; }
+  .course-detail-title > div:first-child { width: 100%; min-width: 0; }
+  .course-detail-title h1 { max-width: 100%; overflow-wrap: anywhere; }
+  .course-detail-title > div:first-child > p:last-child { max-width: 100%; overflow-wrap: anywhere; }
+  .course-detail-title > .course-admin-actions { align-self: flex-end; }
+  .course-detail-cover { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 14px; }
+  .course-detail-cover > img, .course-detail-cover > .course-admin-image-empty { width: 100%; height: clamp(140px, 48vw, 220px); }
+  .course-detail-cover > div:last-child { min-width: 0; overflow-wrap: anywhere; }
+  .course-detail-section { width: 100%; min-width: 0; padding: 15px; box-sizing: border-box; }
+  .course-detail-section-heading { align-items: stretch; flex-wrap: wrap; gap: 12px; }
+  .course-detail-section-heading > div { flex: 1 1 100%; min-width: 0; }
+  .course-detail-section-heading .primary-button { width: 100%; min-height: 42px; justify-content: center; padding: 9px 12px; font-size: 13px; }
+  .course-detail-list { min-width: 0; }
   .course-detail-row { grid-template-columns: minmax(0, 1fr) auto; gap: 7px 12px; }
+  .course-detail-row > div { min-width: 0; }
+  .course-detail-row > div strong, .course-detail-row > div span { white-space: normal; overflow-wrap: anywhere; }
   .course-detail-row > .publish-badge { grid-column: 2; grid-row: 1; }
   .course-detail-row > .text-button { grid-column: 1 / -1; justify-self: start; }
-  .course-student-row { grid-template-columns: 28px minmax(0, 1fr) auto; gap: 4px 10px; padding: 9px 0; }
-  .course-student-row > span { grid-column: 2; }
-  .course-student-row > .text-button { grid-column: 3; grid-row: 1 / span 2; }
+  .course-student-row { grid-template-columns: 28px minmax(0, 1fr); gap: 5px 10px; padding: 11px 0; }
+  .course-student-row > strong { min-width: 0; overflow-wrap: anywhere; }
+  .course-student-row > span { grid-column: 2; min-width: 0; overflow-wrap: anywhere; }
+  .course-student-row > .text-button { grid-column: 2; grid-row: auto; justify-self: start; min-height: 32px; padding: 4px 0; }
 }
 
 /* Keep the lesson player chrome in place while its data is loading. */

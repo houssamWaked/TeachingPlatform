@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { BookOpen, ClipboardText, DeviceMobile, DownloadSimple, GraduationCap, Image, LockKey, MonitorPlay, PencilSimple, Plus, Trash, UserCircle, UsersThree, X } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, BookOpen, ClipboardText, DeviceMobile, DownloadSimple, GraduationCap, Image, LockKey, MonitorPlay, PencilSimple, Plus, Trash, UserCircle, UsersThree, X } from "@phosphor-icons/react";
 import { api, isDemoMode, type StudentAnswer } from "../lib/api";
 import type { Course, Lesson, Student } from "../types";
 import { Shell } from "../context/LocaleContext";
@@ -35,6 +35,7 @@ export function AdminPage() {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [view, setView] = useState<"lessons" | "courses" | "codes" | "students" | "answers">(() => lessonId ? "answers" : "lessons");
+  const [selectedCourseId, setSelectedCourseId] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() => window.matchMedia("(max-width: 820px)").matches);
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -102,6 +103,7 @@ export function AdminPage() {
     return () => { active = false; };
   }, [authenticated, portalRefresh]);
   const selectedAnswerLessonId = answerLessonId || lessonId || lessons[0]?.id || "";
+  const selectedCourse = courses.find((course) => course.id === selectedCourseId) ?? null;
   const selectedAnswerStudent = students.find((student) => student.id === studentId);
   const selectedStudentAnswers = answers.filter((answer) => answer.student_id === studentId);
   const studentAnswerGroups = [...students]
@@ -238,7 +240,7 @@ export function AdminPage() {
             </button>
             <button
               className={view === "courses" ? "active" : ""}
-              onClick={() => { setView("courses"); navigate("/admin"); setMobileNavOpen(false); }}
+              onClick={() => { setView("courses"); setSelectedCourseId(""); navigate("/admin"); setMobileNavOpen(false); }}
             >
               <GraduationCap /> {tx("Courses", "الدورات")}
             </button>
@@ -343,34 +345,51 @@ export function AdminPage() {
           )}
           {view === "courses" && (
             <>
-              <div className="admin-title">
-                <div><p className="eyebrow">{tx("LEARNING PATHS", "مسارات التعلم")}</p><h1>{tx("Courses", "الدورات")}</h1><p>{tx("Create courses, add a cover image, and organize lessons into each course.", "أنشئ دورات وأضف صورة غلاف ونظّم الدروس داخل كل دورة.")}</p></div>
-                <button className="primary-button" onClick={() => { setEditingCourse(null); setCourseDraft({ name: "", description: "", image_path: "" }); setCourseImageFile(null); setCourseError(""); setShowCourseForm(true); }}><Plus /> {tx("New course", "دورة جديدة")}</button>
-              </div>
-              {courses.length ? <div className="course-admin-grid">
-                {courses.map((course) => {
-                  const courseLessons = lessons.filter((lesson) => lesson.course_id === course.id);
-                  const movableLessons = lessons.filter((lesson) => lesson.course_id !== course.id);
-                  return <article className="course-admin-card" key={course.id}>
+              {!selectedCourse ? <>
+                <div className="admin-title">
+                  <div><p className="eyebrow">{tx("LEARNING PATHS", "مسارات التعلم")}</p><h1>{tx("Courses", "الدورات")}</h1><p>{tx("Create courses and organize lessons into each course.", "أنشئ دورات ونظّم الدروس داخل كل دورة.")}</p></div>
+                  <button className="primary-button" onClick={() => { setEditingCourse(null); setCourseDraft({ name: "", description: "", image_path: "" }); setCourseImageFile(null); setCourseError(""); setShowCourseForm(true); }}><Plus /> {tx("New course", "دورة جديدة")}</button>
+                </div>
+                {courses.length ? <div className="course-admin-grid">
+                  {courses.map((course) => <article className="course-admin-card course-admin-card-compact" key={course.id}>
                     {course.image_url || course.image_path?.startsWith("data:image/") ? <img className="course-admin-image" src={course.image_url || course.image_path} alt="" /> : <div className="course-admin-image course-admin-image-empty"><Image aria-hidden="true" /></div>}
-                    <div className="course-admin-content">
-                      <div className="course-admin-heading"><div><h2>{course.name}</h2><p>{course.description || tx("No description yet.", "لا يوجد وصف بعد.")}</p></div>
-                        <div className="course-admin-actions"><button className="icon-button" aria-label={tx("Edit course", "تعديل الدورة")} onClick={() => { setEditingCourse(course); setCourseDraft({ name: course.name, description: course.description, image_path: course.image_path }); setCourseImageFile(null); setCourseError(""); setShowCourseForm(true); }}><PencilSimple /></button><button className="icon-button" aria-label={tx("Delete course", "حذف الدورة")} onClick={async () => { if (!window.confirm(`Delete course “${course.name}”?`)) return; setActionError(""); try { await api.deleteCourse(course.id); setCourses((items) => items.filter((item) => item.id !== course.id)); } catch (error) { setActionError(error instanceof Error ? error.message : "The course could not be deleted."); } }}><Trash /></button></div>
-                      </div>
-                      <div className="course-lesson-list"><strong>{courseLessons.length} {courseLessons.length === 1 ? tx("lesson", "درس") : tx("lessons", "دروس")}</strong>
-                        {courseLessons.map((lesson) => <div className="course-lesson-row" key={lesson.id}><span>{lesson.title}</span><span className={`publish-badge ${lesson.published ? "is-published" : ""}`}>{lesson.published ? tx("Published", "منشور") : tx("Draft", "مسودة")}</span></div>)}
-                        {!courseLessons.length && <p>{tx("No lessons in this course yet.", "لا توجد دروس في هذه الدورة بعد.")}</p>}
-                      </div>
-                      <label className="course-assign-select">{tx("Assign or move a lesson", "تعيين درس أو نقله")}
-                        <select value="" disabled={!movableLessons.length || Boolean(assigningLessonId)} onChange={(event) => { const lessonId = event.target.value; if (lessonId) void moveLessonToCourse(lessonId, course.id); }}>
-                          <option value="">{movableLessons.length ? tx("Choose a lesson…", "اختر درساً…") : tx("All lessons are here", "كل الدروس هنا")}</option>
-                          {movableLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.title} · {courses.find((item) => item.id === lesson.course_id)?.name ?? tx("Other course", "دورة أخرى")}</option>)}
-                        </select>
-                      </label>
-                    </div>
-                  </article>;
-                })}
-              </div> : <div className="empty-state"><GraduationCap /><h3>{tx("Create your first course", "أنشئ دورتك الأولى")}</h3><p>{tx("Courses group lessons and control which students can open them.", "تجمع الدورات الدروس وتحدد الطلاب الذين يمكنهم فتحها.")}</p></div>}
+                    <h2>{course.name}</h2>
+                    <button type="button" className="course-open-button" aria-label={`${tx("Open course", "افتح الدورة")}: ${course.name}`} onClick={() => setSelectedCourseId(course.id)}><ArrowRight aria-hidden="true" /></button>
+                  </article>)}
+                </div> : <div className="empty-state"><GraduationCap /><h3>{tx("Create your first course", "أنشئ دورتك الأولى")}</h3><p>{tx("Courses group lessons and control which students can open them.", "تجمع الدورات الدروس وتحدد الطلاب الذين يمكنهم فتحها.")}</p></div>}
+              </> : <>
+                <div className="admin-title course-detail-title">
+                  <div><button type="button" className="course-detail-back" onClick={() => setSelectedCourseId("")}><ArrowLeft aria-hidden="true" />{tx("All courses", "كل الدورات")}</button><p className="eyebrow">{tx("COURSE DETAILS", "تفاصيل الدورة")}</p><h1>{selectedCourse.name}</h1><p>{selectedCourse.description || tx("No description yet.", "لا يوجد وصف بعد.")}</p></div>
+                  <div className="course-admin-actions">
+                    <button className="icon-button" aria-label={tx("Edit course", "تعديل الدورة")} onClick={() => { setEditingCourse(selectedCourse); setCourseDraft({ name: selectedCourse.name, description: selectedCourse.description, image_path: selectedCourse.image_path }); setCourseImageFile(null); setCourseError(""); setShowCourseForm(true); }}><PencilSimple /></button>
+                    <button className="icon-button" aria-label={tx("Delete course", "حذف الدورة")} onClick={async () => { if (!window.confirm(`Delete course “${selectedCourse.name}”?`)) return; setActionError(""); try { await api.deleteCourse(selectedCourse.id); setCourses((items) => items.filter((item) => item.id !== selectedCourse.id)); setSelectedCourseId(""); } catch (error) { setActionError(error instanceof Error ? error.message : "The course could not be deleted."); } }}><Trash /></button>
+                  </div>
+                </div>
+                <div className="course-detail-cover">
+                  {selectedCourse.image_url || selectedCourse.image_path?.startsWith("data:image/") ? <img src={selectedCourse.image_url || selectedCourse.image_path} alt="" /> : <div className="course-admin-image-empty"><Image aria-hidden="true" /></div>}
+                  <div><strong>{tx("Course description", "وصف الدورة")}</strong><p>{selectedCourse.description || tx("Add a description so students know what this course covers.", "أضف وصفاً ليعرف الطلاب محتوى هذه الدورة.")}</p></div>
+                </div>
+                <section className="course-detail-section">
+                  <div className="course-detail-section-heading"><div><h2>{tx("Lessons", "الدروس")}</h2><p>{tx(`${lessons.filter((lesson) => lesson.course_id === selectedCourse.id).length} lessons in this course`, `${lessons.filter((lesson) => lesson.course_id === selectedCourse.id).length} دروس في هذه الدورة`)}</p></div><button className="primary-button" onClick={() => { setNewLessonCourseId(selectedCourse.id); setShowLessonForm(true); }}><Plus /> {tx("Add lesson", "إضافة درس")}</button></div>
+                  <div className="course-detail-list">
+                    {lessons.filter((lesson) => lesson.course_id === selectedCourse.id).map((lesson) => <div className="course-detail-row" key={lesson.id}><div><strong>{lesson.title}</strong><span>{lesson.description || tx("No description", "لا يوجد وصف")}</span></div><span className={`publish-badge ${lesson.published ? "is-published" : ""}`}>{lesson.published ? tx("Published", "منشور") : tx("Draft", "مسودة")}</span><button className="text-button" onClick={() => setEditingLesson(lesson)}>{tx("Edit / Preview", "تحرير / معاينة")}</button></div>)}
+                    {!lessons.some((lesson) => lesson.course_id === selectedCourse.id) && <p className="course-detail-empty">{tx("No lessons in this course yet. Add the first lesson here.", "لا توجد دروس في هذه الدورة بعد. أضف الدرس الأول هنا.")}</p>}
+                  </div>
+                  {lessons.some((lesson) => lesson.course_id !== selectedCourse.id) && <label className="course-assign-select">{tx("Move an existing lesson into this course", "نقل درس موجود إلى هذه الدورة")}
+                    <select value="" disabled={Boolean(assigningLessonId)} onChange={(event) => { const lessonId = event.target.value; if (lessonId) void moveLessonToCourse(lessonId, selectedCourse.id); }}>
+                      <option value="">{tx("Choose a lesson…", "اختر درساً…")}</option>
+                      {lessons.filter((lesson) => lesson.course_id !== selectedCourse.id).map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.title} · {courses.find((item) => item.id === lesson.course_id)?.name ?? tx("Other course", "دورة أخرى")}</option>)}
+                    </select>
+                  </label>}
+                </section>
+                <section className="course-detail-section">
+                  <div className="course-detail-section-heading"><div><h2>{tx("Enrolled students", "الطلاب المسجلون")}</h2><p>{tx(`${students.filter((student) => student.course_ids?.includes(selectedCourse.id)).length} students`, `${students.filter((student) => student.course_ids?.includes(selectedCourse.id)).length} طلاب`)}</p></div></div>
+                  <div className="course-detail-list">
+                    {students.filter((student) => student.course_ids?.includes(selectedCourse.id)).map((student) => <div className="course-student-row" key={student.id}><UserCircle aria-hidden="true" /><strong>{student.name}</strong><span>{tx("Access code", "رمز الدخول")}: {student.code}</span></div>)}
+                    {!students.some((student) => student.course_ids?.includes(selectedCourse.id)) && <p className="course-detail-empty">{tx("No students are enrolled in this course yet.", "لا يوجد طلاب مسجلون في هذه الدورة بعد.")}</p>}
+                  </div>
+                </section>
+              </>}
             </>
           )}
           {view === "codes" && (

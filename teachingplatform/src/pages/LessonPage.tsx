@@ -160,9 +160,27 @@ export function LessonPage() {
 
   if (!lesson) {
     return (
-      <Shell>
-        <main className="page-container" id="main-content" tabIndex={-1}>
-          <div className="lesson-detail-skeleton skeleton" />
+      <Shell hideHeader>
+        <main className="page-container protected-content lesson-shell-layout lesson-reference-page lesson-loading-page" id="main-content" tabIndex={-1} aria-busy="true">
+          <header className="lesson-player-header">
+            <div className="lesson-player-title">
+              <button type="button" className="lesson-back-button" onClick={() => navigate("/dashboard")} aria-label={tx("Back to my lessons", "العودة إلى دروسي")}><ArrowLeft aria-hidden="true" /></button>
+              <span className="lesson-header-divider" aria-hidden="true" />
+              <h1 className="lesson-loading-title"><span className="visually-hidden">{tx("Loading lesson", "جارٍ تحميل الدرس")}</span></h1>
+            </div>
+            <button type="button" className="lesson-profile-button" onClick={() => navigate("/profile")}>{profile.photo_url ? <img src={profile.photo_url} alt="" /> : <UserCircle aria-hidden="true" />}<span>{tx("Profile", "الملف الشخصي")}</span></button>
+            <ThemeToggle />
+            <button type="button" className="lesson-exit-button" onClick={() => navigate("/dashboard")}>{tx("Exit Portal", "الخروج")}</button>
+          </header>
+          <div className="lesson-player-workspace lesson-loading-workspace">
+            <aside className="admin-sidebar lesson-section-sidebar lesson-loading-sidebar" aria-hidden="true">
+              <div>
+                <div className="lesson-sidebar-heading"><p>{tx("LESSON CONTENT", "محتوى الدرس")}</p><button type="button" className="lesson-sidebar-toggle" tabIndex={-1}><ArrowLeft aria-hidden="true" /></button></div>
+                <div className="lesson-loading-tab skeleton" />
+              </div>
+            </aside>
+            <section className="lesson-loading-content" aria-hidden="true"><div className="lesson-loading-heading skeleton" /><div className="lesson-loading-block skeleton" /></section>
+          </div>
         </main>
       </Shell>
     );

@@ -2,7 +2,11 @@ import { demoLessons, demoStudents } from "../data/demo";
 import type { Course, Lesson, Question, Student } from "../types";
 import { getDeviceFingerprint } from "./device";
 
-const base = import.meta.env.VITE_API_BASE_URL as string | undefined;
+// Production uses a same-origin Vercel rewrite so the student session cookie
+// remains first-party on mobile browsers that block cross-site cookies.
+const base = import.meta.env.PROD
+  ? "/api"
+  : (import.meta.env.VITE_API_BASE_URL as string | undefined);
 export const isDemoMode = !base;
 const SESSION = "lesson_portal_session_hint";
 const progressKey = "lesson_portal_demo_progress";
@@ -32,8 +36,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "Something went wrong.");
+  if (!response.ok) {
+    clearExpiredStudentSession(path, response.status);
+    throw new Error(data.error || "Something went wrong.");
+  }
   return data;
+}
+
+function clearExpiredStudentSession(path: string, status: number) {
+  if (status !== 401 || path.startsWith("/admin/") || path === "/redeem-code" || path === "/logout") return;
+  localStorage.removeItem(SESSION);
+  if (window.location.pathname !== "/access" && window.location.pathname !== "/") {
+    window.location.replace("/access");
+  }
 }
 
 async function requestForm<T>(path: string, form: FormData): Promise<T> {
@@ -44,7 +59,10 @@ async function requestForm<T>(path: string, form: FormData): Promise<T> {
     body: form,
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "Something went wrong.");
+  if (!response.ok) {
+    clearExpiredStudentSession(path, response.status);
+    throw new Error(data.error || "Something went wrong.");
+  }
   return data;
 }
 

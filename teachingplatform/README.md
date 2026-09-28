@@ -1,4 +1,4 @@
-# Lesson Portal
+# Deeb Center
 
 A single-teacher lesson platform built with React, Vite, Tailwind CSS, Supabase, and Bunny Stream. Students redeem a one-time code, which is bound to a device fingerprint. The production session token lives only in an `httpOnly` cookie.
 

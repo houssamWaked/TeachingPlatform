@@ -109,7 +109,7 @@ export function Landing() {
       <section className="hero-section fresh-hero">
         <div className="hero-copy fresh-hero-copy">
           <p className="eyebrow">{tx("A quiet space to grow", "مساحة هادئة للنمو")}</p>
-          <h1>{tx("Welcome to", "مرحباً بك في")}<br />{tx("Lesson Portal", "بوابة الدروس")}</h1>
+          <h1>{tx("Welcome to", "مرحباً بك في")}<br />{tx("Deeb Center", "Deeb Center")}</h1>
           <p className="hero-lede desktop-helper">{tx("Enter your access code to continue your journey. A quiet space designed for focused learning and meaningful progress.", "أدخل رمز الدخول لمتابعة رحلتك التعليمية في مساحة هادئة للتعلم والتركيز والتقدم.")}</p>
           <p className="hero-lede mobile-helper">{tx("Enter your access code below to continue.", "أدخل رمز الدخول أدناه للمتابعة.")}</p>
         </div>

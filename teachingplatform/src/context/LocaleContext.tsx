@@ -43,7 +43,7 @@ export function Brand() {
       <span className="brand-mark">
         <img src="/figma/landing-desktop-book-open.svg" alt="" aria-hidden="true" />
       </span>
-      <span>{tx("Lesson Portal", "بوابة الدروس")}</span>
+      <span>{tx("Deeb Center", "Deeb Center")}</span>
     </>
   );
 }

@@ -79,7 +79,7 @@ export function TeacherAuthUI({
           </form>
           <Link className="teacher-auth-back" to="/"><ArrowLeft aria-hidden="true" /> {tx("Back to student portal", "العودة إلى بوابة الطالب")}</Link>
         </div>
-        <small className="teacher-auth-copyright">© 2026VH Lesson Portal. {tx("All rights reserved.", "جميع الحقوق محفوظة.")}</small>
+        <small className="teacher-auth-copyright">© 2026 Deeb Center. {tx("All rights reserved.", "جميع الحقوق محفوظة.")}</small>
       </section>
 
       <aside className="teacher-auth-visual" aria-label={tx("A calm place to plan what students learn next", "مساحة هادئة للتخطيط لما سيتعلمه الطلاب لاحقاً")}>

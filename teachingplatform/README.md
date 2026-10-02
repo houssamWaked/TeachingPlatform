@@ -1,28 +1,25 @@
-# Deeb Center
+# Deeb Center website
 
-A single-teacher lesson platform built with React, Vite, Tailwind CSS, Supabase, and Bunny Stream. Students redeem a one-time code, which is bound to a device fingerprint. The production session token lives only in an `httpOnly` cookie.
+The public React site is the Deeb Center download landing page. Student and teacher platform screens are bundled into the Flutter desktop and mobile apps under `D:\Teachingplatform\Teachingplatform_flutter\platform_ui`; changing this landing page does not change those app screens.
 
 ## Local preview
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Without `VITE_API_BASE_URL`, the UI runs in demo mode (student code `LESSON26`, teacher password `teacher`).
+## Downloads
 
-## Bunny Stream setup
+Windows downloads are served from `public/downloads/DeebCenter-Setup-1.0.0-x64.exe`. Replace that file with each signed release installer before deploying the landing page. The website currently links to this exact path.
 
-1. In Bunny.net, create a **Stream Video Library** and note its Library ID and library API key.
-2. In that library's security settings, enable **Token Authentication**. Copy its token security key as `BUNNY_STREAM_SIGNING_KEY`. Keep it private.
-3. Set allowed referrers to your deployed frontend hostname (and localhost during development). Copy the exact CDN hostname shown on the library API screen into `BUNNY_STREAM_CDN_HOST` (hostname only, without `https://`).
-4. Upload videos from `/admin`. Bunny assigns each video a GUID; the app stores that GUID in the existing `lessons.video_id` column. Allow Bunny time to encode each new upload before playback.
+## API routing for the apps
 
-The app signs HLS playlist URLs server-side for 12 minutes. The browser receives only that short-lived signed URL and loads it through hls.js (or native HLS where available). Lesson pages display a subtle, session-specific pseudonymous watermark code; the learner's name and redemption code are not embedded. This is a deterrent, not DRM; screen recording remains possible.
+The Flutter apps use a loopback server for their bundled UI and forward same-origin `/api` requests through the existing Vercel API route. Keep the `/api/(.*)` rewrite in `vercel.json`; it forwards requests to the existing Supabase Edge Function. The catch-all rewrite serves the public landing page for website paths, so old platform paths no longer render the student or teacher UI.
 
-## Supabase setup
+## Supabase API deployment
 
-Install the Supabase CLI, authenticate, and link the project. Then run:
+Install the Supabase CLI, authenticate, and link the existing project. Then run:
 
 ```bash
 supabase db push
@@ -34,39 +31,25 @@ supabase secrets set BUNNY_STREAM_API_KEY=YOUR_LIBRARY_API_KEY
 supabase secrets set BUNNY_STREAM_SIGNING_KEY=YOUR_TOKEN_SECURITY_KEY
 supabase secrets set FORENSIC_WATERMARK_SECRET=YOUR_RANDOM_WATERMARK_SECRET
 supabase secrets set ADMIN_PASSWORD=YOUR_LONG_ADMIN_PASSWORD
-supabase secrets set ALLOWED_ORIGIN=https://YOUR_FRONTEND_DOMAIN
+supabase secrets set ALLOWED_ORIGIN=https://teaching-platform-one.vercel.app
 supabase functions deploy api --no-verify-jwt
 ```
 
-Copy `.env.example` to `.env.local` and set only `VITE_API_BASE_URL` for the frontend. Bunny and Supabase service secrets belong only in Supabase Function secrets, never Vite variables. Do not put real keys in `.env.example`.
+Keep Supabase service-role and Bunny secrets in Supabase Function secrets only. Never put them in Vite variables, `public/`, or the Flutter app.
 
-## Security model
+## Backend notes
 
-- Database schema, RLS, code redemption, device lock, PDFs, questions, and progress are unchanged.
-- The Edge Function validates the hashed session token and device fingerprint before creating playback URLs.
-- Bunny token authentication uses a 12-minute expiry. HLS requests use the signed playlist URL; token authentication must be enabled in the Bunny library.
-- PDFs remain in the private `lesson-pdfs` bucket and use five-minute signed URLs.
-- Right-click, selection, printing, common devtools shortcuts, and visible developer-tools playback remain browser deterrents. Bunny Stream does not prevent screen recording.
-- The web capture monitor only sees `getDisplayMedia()` streams initiated through the current page realm. It cannot detect OS screenshots, browser chrome capture, external recording software, extensions, or external cameras. See [capture protection capabilities and limits](docs/capture-protection.md).
-
-## Test end to end
-
-1. Deploy the API with the Bunny secrets above and set `VITE_API_BASE_URL` in `.env.local`.
-2. Sign into `/admin`, create a lesson, select a small MP4 plus its PDF, and submit. The admin request creates a Bunny video then uploads its file; the returned GUID is saved with the lesson.
-3. Wait for Bunny encoding to finish, generate/redeem a student code, and open that lesson.
-4. Press Play. Confirm HLS playback starts and the visible name/code/time watermark shifts after 30 seconds. Refresh playback to check that a new short-lived URL is issued.
-
-## Upload size note
-
-Admin uploads are proxied through the Supabase Edge Function so the Bunny API key never reaches the browser. Supabase Edge Functions impose request-size and execution limits, so the existing 5 GB browser selection limit is not a guarantee that a 5 GB proxied upload will complete. For large production lessons, use a dedicated resumable upload service or Bunny-compatible TUS flow that issues narrowly scoped upload authorization without exposing the library API key. Small test uploads should work through the current Edge Function path.
+- Student code redemption and device binding, teacher operations, course and lesson data, progress, PDFs, and Bunny Stream playback remain in the existing Supabase Edge Function and database.
+- The API validates the hashed session token and device fingerprint before allowing protected operations or issuing media URLs.
+- Bunny playback URLs expire after 12 minutes; private PDF links expire after five minutes.
+- The app uses native platform capture protection where supported. These controls depend on the operating system and capture method and cannot prevent external cameras or every recording tool.
 
 ## Project structure
 
 ```text
-src/                       React student and teacher routes
-supabase/migrations/        Existing schema and policies
-supabase/functions/api/    Session, lesson, progress, admin, PDF, Bunny video API
-supabase/functions/_shared/ Cookie, CORS, hashing, auth helpers
+src/                       Public React download landing page
+public/downloads/           User-facing desktop installer download
+supabase/migrations/        Existing database schema and policies
+supabase/functions/api/    Existing student and teacher API
+supabase/functions/_shared/ Cookie, CORS, hashing, and auth helpers
 ```
-
-Before launch, upload lesson videos and PDFs, generate the first code batch in `/admin`, and rotate any staging secrets.

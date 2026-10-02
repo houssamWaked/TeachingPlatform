@@ -2,6 +2,7 @@ import { ArrowDown, ArrowRight, BookOpen, Desktop, DeviceMobile, DownloadSimple,
 import "./landing-page.css";
 
 const installerUrl = "/downloads/DeebCenter-Setup-1.0.0-x64.exe";
+const androidApkUrl = "/downloads/DeebCenter-Android-1.0.0-preview.apk";
 
 function Brand() {
   return (
@@ -53,8 +54,8 @@ function LandingPage() {
             <p className="hero-kicker"><span /> A calmer way to learn</p>
             <h1>Make room for<br /><em>understanding.</em></h1>
             <p className="hero-description">Lessons, study materials, and progress come together in one focused space—so you can spend less time searching and more time learning.</p>
-            <div className="hero-actions"><a className="primary-download" href={installerUrl} download><DownloadSimple weight="bold" aria-hidden="true" /> Download for Windows <ArrowRight weight="bold" aria-hidden="true" /></a><a className="text-link" href="#learning">Explore the app <ArrowDown weight="bold" aria-hidden="true" /></a></div>
-            <p className="download-meta"><Desktop weight="duotone" aria-hidden="true" /> Windows desktop app <span>·</span> Free to download</p>
+            <div className="hero-actions"><a className="primary-download" href={installerUrl} download><DownloadSimple weight="bold" aria-hidden="true" /> Download for Windows <ArrowRight weight="bold" aria-hidden="true" /></a><a className="android-download" href={androidApkUrl} download><DeviceMobile weight="duotone" aria-hidden="true" /> Android APK</a><a className="text-link" href="#learning">Explore the app <ArrowDown weight="bold" aria-hidden="true" /></a></div>
+            <p className="download-meta"><Desktop weight="duotone" aria-hidden="true" /> Windows desktop app <span>·</span> Android preview available</p>
           </div>
           <LessonPreview />
         </div>
@@ -78,7 +79,7 @@ function LandingPage() {
 
       <section className="download-final">
         <div><p className="section-kicker">Ready when you are</p><h2>Start with your<br /><em>next lesson.</em></h2></div>
-        <div className="final-action"><a className="primary-download" href={installerUrl} download><DownloadSimple weight="bold" aria-hidden="true" /> Download for Windows <ArrowRight weight="bold" aria-hidden="true" /></a><p>Windows 10 or later <span>·</span> Desktop app</p></div>
+        <div className="final-action"><a className="primary-download" href={installerUrl} download><DownloadSimple weight="bold" aria-hidden="true" /> Download for Windows <ArrowRight weight="bold" aria-hidden="true" /></a><a className="android-download" href={androidApkUrl} download><DeviceMobile weight="duotone" aria-hidden="true" /> Download Android APK</a><p>Windows 10 or later <span>·</span> Android preview</p></div>
       </section>
 
       <footer className="download-footer"><Brand /><span>© {new Date().getFullYear()} Deeb Center</span><a href="#top">Back to top <ArrowDown weight="bold" aria-hidden="true" /></a></footer>

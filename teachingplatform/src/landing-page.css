@@ -43,6 +43,9 @@
 .primary-download { display: inline-flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 16px; color: #fff !important; background: var(--green); border-radius: 6px; font-size: 12px; font-weight: 650; transition: background 160ms ease, transform 160ms ease; }
 .primary-download svg:first-child { width: 16px; height: 16px; }
 .primary-download svg:last-child { width: 14px; height: 14px; margin-left: 6px; }
+.android-download { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid rgb(28 41 35 / 16%); border-radius: 6px; color: var(--green) !important; font-size: 11px; font-weight: 650; transition: background 160ms ease, border-color 160ms ease; }
+.android-download:hover { background: #edf2ed; border-color: rgb(28 41 35 / 30%); }
+.android-download svg { width: 16px; height: 16px; }
 .text-link { display: inline-flex; align-items: center; gap: 9px; color: #49564f !important; font-size: 12px; font-weight: 650; }
 .text-link svg { width: 13px; height: 13px; }
 .download-meta { display: flex; align-items: center; gap: 8px; margin: 18px 0 0; color: #7b857f; font-size: 11px; }

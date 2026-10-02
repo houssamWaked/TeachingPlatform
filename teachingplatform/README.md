@@ -13,6 +13,8 @@ npm run dev
 
 Windows downloads are served from `public/downloads/DeebCenter-Setup-1.0.0-x64.exe`. Replace that file with each signed release installer before deploying the landing page. The website currently links to this exact path.
 
+The Android preview is served from `public/downloads/DeebCenter-Android-1.0.0-preview.apk`. Replace it with the current APK before deploying the landing page. The download card labels it as a preview build.
+
 ## API routing for the apps
 
 The Flutter apps use a loopback server for their bundled UI and forward same-origin `/api` requests through the existing Vercel API route. Keep the `/api/(.*)` rewrite in `vercel.json`; it forwards requests to the existing Supabase Edge Function. The catch-all rewrite serves the public landing page for website paths, so old platform paths no longer render the student or teacher UI.

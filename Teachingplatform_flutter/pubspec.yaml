@@ -1,0 +1,158 @@
+name: deeb_center_app
+description: Deeb Center desktop and mobile application.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_inappwebview: ^6.2.0-beta.3
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/platform/asset-manifest.json
+    - assets/platform/assets/index-B27f7j4I.js
+    - assets/platform/assets/index-CV2Sg__F.css
+    - assets/platform/assets/lesson-shared-background-CKTl5Ogr.png
+    - assets/platform/assets/pdf.worker.min-Dswkl-cV.mjs
+    - assets/platform/favicon.svg
+    - assets/platform/figma/access-codes-desktop-copy.svg
+    - assets/platform/figma/access-codes-desktop-download.svg
+    - assets/platform/figma/access-codes-desktop-icon-container.svg
+    - assets/platform/figma/access-codes-desktop-icon-frame.svg
+    - assets/platform/figma/access-codes-desktop-icon-frame1.svg
+    - assets/platform/figma/access-codes-desktop-icon-frame2.svg
+    - assets/platform/figma/access-codes-desktop-icon-frame3.svg
+    - assets/platform/figma/access-codes-desktop-icon-frame4.svg
+    - assets/platform/figma/access-codes-desktop-log-out.svg
+    - assets/platform/figma/access-codes-desktop-plus.svg
+    - assets/platform/figma/access-codes-desktop-profile-avatar.png
+    - assets/platform/figma/access-codes-desktop-ticket.svg
+    - assets/platform/figma/access-codes-mobile-download.svg
+    - assets/platform/figma/access-codes-mobile-ios-battery-full.svg
+    - assets/platform/figma/access-codes-mobile-ios-signal.svg
+    - assets/platform/figma/access-codes-mobile-ios-wifi-signal.svg
+    - assets/platform/figma/access-codes-mobile-logo-icon.svg
+    - assets/platform/figma/access-codes-mobile-menu.svg
+    - assets/platform/figma/access-codes-mobile-plus.svg
+    - assets/platform/figma/access-codes-mobile-ticket.svg
+    - assets/platform/figma/dark-access-codes-avatar.png
+    - assets/platform/figma/dark-lesson-builder-desktop-eye.svg
+    - assets/platform/figma/dark-lesson-builder-desktop-image.svg
+    - assets/platform/figma/dark-lesson-builder-desktop-play.svg
+    - assets/platform/figma/dark-lesson-builder-desktop-plus.svg
+    - assets/platform/figma/dark-lesson-builder-desktop-settings.svg
+    - assets/platform/figma/dark-lesson-builder-desktop-toggle.svg
+    - assets/platform/figma/dark-lesson-builder-desktop-x.svg
+    - assets/platform/figma/dark-lesson-builder-mobile-image.svg
+    - assets/platform/figma/dark-lesson-builder-mobile-ios-battery-full.svg
+    - assets/platform/figma/dark-lesson-builder-mobile-ios-signal.svg
+    - assets/platform/figma/dark-lesson-builder-mobile-ios-wifi-signal.svg
+    - assets/platform/figma/dark-lesson-builder-mobile-play.svg
+    - assets/platform/figma/dark-student-dashboard-mobile-thumbnail.png
+    - assets/platform/figma/dark-student-dashboard-thumbnail.png
+    - assets/platform/figma/dark-student-lesson-mobile-video.png
+    - assets/platform/figma/dark-student-lesson-video.png
+    - assets/platform/figma/dark-teacher-dashboard-avatar.png
+    - assets/platform/figma/dark-teacher-dashboard-mobile-thumbnail.png
+    - assets/platform/figma/dark-teacher-dashboard-thumbnail.png
+    - assets/platform/figma/dark-teacher-sign-in-art.png
+    - assets/platform/figma/dark-teacher-sign-in-mobile-banner.png
+    - assets/platform/figma/landing-desktop-arrow-right.svg
+    - assets/platform/figma/landing-desktop-book-open.svg
+    - assets/platform/figma/landing-desktop-key.svg
+    - assets/platform/figma/landing-mobile-arrow-right.svg
+    - assets/platform/figma/landing-mobile-book-open.svg
+    - assets/platform/figma/landing-mobile-key.svg
+    - assets/platform/figma/lesson-builder-desktop-eye.svg
+    - assets/platform/figma/lesson-builder-desktop-image.svg
+    - assets/platform/figma/lesson-builder-desktop-play.svg
+    - assets/platform/figma/lesson-builder-desktop-plus.svg
+    - assets/platform/figma/lesson-builder-desktop-settings.svg
+    - assets/platform/figma/lesson-builder-desktop-toggle-switch.svg
+    - assets/platform/figma/lesson-builder-desktop-x-circle.svg
+    - assets/platform/figma/lesson-builder-mobile-ios-battery-full.svg
+    - assets/platform/figma/lesson-builder-mobile-ios-signal.svg
+    - assets/platform/figma/lesson-builder-mobile-ios-wifi-signal.svg
+    - assets/platform/figma/lesson-builder-mobile-play.svg
+    - assets/platform/figma/lesson-builder-mobile-plus.svg
+    - assets/platform/figma/lesson-builder-mobile-x-circle.svg
+    - assets/platform/figma/student-dashboard-desktop-arrow-right.svg
+    - assets/platform/figma/student-dashboard-desktop-book-open.svg
+    - assets/platform/figma/student-dashboard-desktop-lesson-thumbnail.png
+    - assets/platform/figma/student-dashboard-mobile-arrow-right.svg
+    - assets/platform/figma/student-dashboard-mobile-book-open.svg
+    - assets/platform/figma/student-dashboard-mobile-lesson-thumbnail-mobile.png
+    - assets/platform/figma/student-lesson-desktop-chevron-left.svg
+    - assets/platform/figma/student-lesson-desktop-file.svg
+    - assets/platform/figma/student-lesson-desktop-help-circle.svg
+    - assets/platform/figma/student-lesson-desktop-icon-container.svg
+    - assets/platform/figma/student-lesson-desktop-maximize.svg
+    - assets/platform/figma/student-lesson-desktop-paperclip.svg
+    - assets/platform/figma/student-lesson-desktop-play.svg
+    - assets/platform/figma/student-lesson-desktop-play1.svg
+    - assets/platform/figma/student-lesson-desktop-settings.svg
+    - assets/platform/figma/student-lesson-desktop-skip-forward.svg
+    - assets/platform/figma/student-lesson-desktop-video-player-container.png
+    - assets/platform/figma/student-lesson-desktop-video.svg
+    - assets/platform/figma/student-lesson-desktop-volume2.svg
+    - assets/platform/figma/student-lesson-mobile-icon-container.svg
+    - assets/platform/figma/student-lesson-mobile-ios-battery-full.svg
+    - assets/platform/figma/student-lesson-mobile-ios-signal.svg
+    - assets/platform/figma/student-lesson-mobile-ios-wifi-signal.svg
+    - assets/platform/figma/student-lesson-mobile-maximize.svg
+    - assets/platform/figma/student-lesson-mobile-mobile-video-player.png
+    - assets/platform/figma/student-lesson-mobile-play.svg
+    - assets/platform/figma/teacher-dashboard-desktop-book-open.svg
+    - assets/platform/figma/teacher-dashboard-desktop-clipboard.svg
+    - assets/platform/figma/teacher-dashboard-desktop-icon-container.svg
+    - assets/platform/figma/teacher-dashboard-desktop-key.svg
+    - assets/platform/figma/teacher-dashboard-desktop-log-out.svg
+    - assets/platform/figma/teacher-dashboard-desktop-plus.svg
+    - assets/platform/figma/teacher-dashboard-desktop-profile-avatar.png
+    - assets/platform/figma/teacher-dashboard-desktop-shield.svg
+    - assets/platform/figma/teacher-dashboard-desktop-thumb.png
+    - assets/platform/figma/teacher-dashboard-desktop-trash.svg
+    - assets/platform/figma/teacher-dashboard-desktop-users.svg
+    - assets/platform/figma/teacher-dashboard-mobile-icon-container.svg
+    - assets/platform/figma/teacher-dashboard-mobile-ios-battery-full.svg
+    - assets/platform/figma/teacher-dashboard-mobile-ios-signal.svg
+    - assets/platform/figma/teacher-dashboard-mobile-ios-wifi-signal.svg
+    - assets/platform/figma/teacher-dashboard-mobile-line.svg
+    - assets/platform/figma/teacher-dashboard-mobile-menu.svg
+    - assets/platform/figma/teacher-dashboard-mobile-plus.svg
+    - assets/platform/figma/teacher-dashboard-mobile-thumb.png
+    - assets/platform/figma/teacher-dashboard-mobile-trash.svg
+    - assets/platform/figma/teacher-sign-in-desktop-arrow-left.svg
+    - assets/platform/figma/teacher-sign-in-desktop-arrow-right.svg
+    - assets/platform/figma/teacher-sign-in-desktop-art-side.png
+    - assets/platform/figma/teacher-sign-in-desktop-book-open.svg
+    - assets/platform/figma/teacher-sign-in-desktop-eye.svg
+    - assets/platform/figma/teacher-sign-in-desktop-lock.svg
+    - assets/platform/figma/teacher-sign-in-mobile-arrow-left.svg
+    - assets/platform/figma/teacher-sign-in-mobile-arrow-right.svg
+    - assets/platform/figma/teacher-sign-in-mobile-book-open.svg
+    - assets/platform/figma/teacher-sign-in-mobile-eye.svg
+    - assets/platform/figma/teacher-sign-in-mobile-lock.svg
+    - assets/platform/figma/teacher-sign-in-mobile-mini-art-banner.png
+    - assets/platform/figma/teacher-sign-in-mobile-settings.svg
+    - assets/platform/icons.svg
+    - assets/platform/index.html
+    - assets/platform/login-forest-desktop.png
+    - assets/platform/login-forest-mobile.png
+    - assets/platform/student-dashboard-gradient.png
+    - assets/platform/student-dashboard-study-background-sharp.png
+    - assets/platform/student-dashboard-study-background.png
+    - assets/platform/student-library-calm.png
+    - assets/platform/student-mentor-avatar.png
+    - assets/platform/teacher-auth-illustration-hd.png

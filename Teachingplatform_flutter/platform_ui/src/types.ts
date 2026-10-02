@@ -1,0 +1,12 @@
+export type ProgressState = 'not_started' | 'in_progress' | 'completed'
+export type Question = { id: string; question_text: string; question_type: 'text' | 'multiple_choice'; options?: string[]; correct_answer?: string | null }
+export type LessonBlockType = 'text' | 'heading' | 'callout' | 'divider' | 'image' | 'link' | 'video' | 'pdf' | 'word' | 'embed'
+export type LessonBlockStyle = { backgroundColor?: string; color?: string; fontSize?: number; textAlign?: 'left' | 'center' | 'right'; padding?: number; width?: number; borderRadius?: number; imageFit?: 'cover' | 'contain'; thickness?: number }
+export type LessonBlock = { id: string; type: LessonBlockType; text?: string; title?: string; url?: string; filePath?: string; videoId?: string; attachmentName?: string; caption?: string; level?: 2 | 3; mediaEmpty?: boolean; style?: LessonBlockStyle }
+export type LessonSection = { id: string; title: string; blocks: LessonBlock[] }
+export type LessonTab = { id: string; title: string; blocks: LessonBlock[] }
+export type LessonPageStyle = { backgroundColor?: string; backgroundImage?: string; cardImage?: string; cardImageName?: string }
+export type LessonContent = { blocks: LessonBlock[]; sections: LessonSection[]; tabs?: LessonTab[]; quizEnabled?: boolean; quizTitle?: string; pageStyle?: LessonPageStyle }
+export type Lesson = { id:string; title:string; description:string; video_id:string; pdf_path:string; word_path?:string; course_id:string; course_name?:string; published?:boolean; content?:LessonContent; order_index:number; duration:string; status:ProgressState; progressPercent:number; progress:{video_watched:boolean;pdf_viewed:boolean;questions_completed:boolean;manual_completed:boolean}; questions:Question[] }
+export type Course = { id:string; name:string; description:string; image_path:string; image_url?:string; lessons?:Lesson[] }
+export type Student = { id:string; name:string; code:string; device_locked:boolean; completed:number; course_ids?:string[] }

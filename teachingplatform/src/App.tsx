@@ -14,7 +14,7 @@ import {
 import "./landing-page.css";
 
 const installerUrl = "/downloads/DeebCenter-Setup-1.0.0-x64.exe";
-const androidApkUrl = "/downloads/DeebCenter-Android-2.0.0-preview.apk";
+const androidApkUrl = "/downloads/DeebCenter-Android-2.0.1-preview.apk";
 
 function Brand() {
   return (
@@ -168,7 +168,7 @@ function LandingPage() {
           <article className="download-card">
             <div className="download-card-topline"><span className="download-card-label download-card-label-preview">Android preview</span><DeviceMobile weight="duotone" /></div>
             <h3>Deeb Center for Android</h3>
-            <p>Install the Android preview package on your phone. Remove version 1.0.0 first if it is already installed.</p>
+            <p>Uninstall an older preview build before installing this update.</p>
             <a className="download-card-action download-card-action-secondary" href={androidApkUrl} download><DownloadSimple weight="bold" /> Get Android APK</a>
             <small>Preview APK · 61 MB</small>
           </article>

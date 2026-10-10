@@ -1,5 +1,5 @@
 #define AppName "Deeb Center"
-#define AppVersion "1.0.0"
+#define AppVersion "2.0.2"
 #define AppExe "teachingplatform_flutter.exe"
 #define BuildDir "..\build\windows\x64\runner\Release"
 
@@ -26,7 +26,7 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 CloseApplications=yes
 RestartApplications=no
-VersionInfoVersion=1.0.0.0
+VersionInfoVersion=2.0.2.0
 VersionInfoCompany=Deeb Center
 VersionInfoDescription=Deeb Center Setup
 VersionInfoProductName=Deeb Center

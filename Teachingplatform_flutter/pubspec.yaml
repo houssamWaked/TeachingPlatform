@@ -1,7 +1,7 @@
 name: deeb_center_app
 description: Deeb Center desktop and mobile application.
 publish_to: none
-version: 2.0.1+3
+version: 2.0.2+4
 
 environment:
   sdk: '>=3.10.0 <4.0.0'
@@ -21,16 +21,24 @@ flutter:
   uses-material-design: true
   assets:
     - assets/platform/asset-manifest.json
-    - assets/platform/assets/index-DNP1pSy9.css
-    - assets/platform/assets/index-hTdh0n3v.js
+    - assets/platform/assets/AdminPage-DZP7D6NO.js
+    - assets/platform/assets/ArrowLeft.es-NwYQ2PQu.js
+    - assets/platform/assets/browser-B2kBgD8H.js
+    - assets/platform/assets/DeviceMobile.es-BlJvLg2y.js
+    - assets/platform/assets/index-_nWmIKF4.js
+    - assets/platform/assets/index-CzubfJ7G.css
     - assets/platform/assets/lesson-shared-background-CKTl5Ogr.png
-    - assets/platform/assets/newsreader-latin-ext-wght-normal-C-3rgBeH.woff2
-    - assets/platform/assets/newsreader-latin-wght-normal-CCVVNp6i.woff2
-    - assets/platform/assets/newsreader-vietnamese-wght-normal-Czsa-EzN.woff2
+    - assets/platform/assets/LessonPage-BRAMHhte.js
+    - assets/platform/assets/NotFoundPage-DLCE9SK1.js
     - assets/platform/assets/pdf.worker.min-Dswkl-cV.mjs
-    - assets/platform/assets/plus-jakarta-sans-latin-ext-wght-normal-DmpS2jIq.woff2
-    - assets/platform/assets/plus-jakarta-sans-latin-wght-normal-eXO_dkmS.woff2
-    - assets/platform/assets/plus-jakarta-sans-vietnamese-wght-normal-qRpaaN48.woff2
+    - assets/platform/assets/PdfPageReader-BcZPxY1V.js
+    - assets/platform/assets/PublicPages-BhoV1A6F.js
+    - assets/platform/assets/rolldown-runtime-C0FnF6B9.js
+    - assets/platform/assets/SecureVideo-BijjogYw.js
+    - assets/platform/assets/StudentProfilePage-Bc7IRn7O.js
+    - assets/platform/assets/useLessonImageUrl-D7vdJyA5.js
+    - assets/platform/assets/UserCircle.es-BORwJZcV.js
+    - assets/platform/assets/WordDocumentReader-B6F0Dr62.js
     - assets/platform/favicon.svg
     - assets/platform/figma/access-codes-desktop-copy.svg
     - assets/platform/figma/access-codes-desktop-download.svg

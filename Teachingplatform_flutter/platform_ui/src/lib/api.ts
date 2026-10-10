@@ -478,7 +478,8 @@ export const api = {
       const upload = new Upload(file, {
         endpoint: "https://video.bunnycdn.com/tusupload",
         retryDelays: [0, 3000, 5000, 10000, 20000, 60000],
-        chunkSize: 50 * 1024 * 1024,
+        // Keep each in-flight upload buffer small for low-memory phones and PCs.
+        chunkSize: 8 * 1024 * 1024,
         removeFingerprintOnSuccess: true,
         headers: {
           AuthorizationSignature: credentials.signature,

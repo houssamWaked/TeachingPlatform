@@ -11,7 +11,7 @@ npm run dev
 
 ## Downloads
 
-Windows downloads are served from `public/downloads/DeebCenter-Setup-1.0.0-x64.exe`. Replace that file with each signed release installer before deploying the landing page. The website currently links to this exact path.
+Windows preview installer: `public/downloads/DeebCenter-Setup-1.0.0-x64.exe`. The Windows publishing workflow replaces the link and installer with each new preview release.
 
 The Android preview is served from `public/downloads/DeebCenter-Android-2.0.1-preview.apk`. The Android preview card links to the current version (2.0.1) and shows its size.
 

@@ -1,0 +1,95 @@
+name: Build and publish Windows preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Teachingplatform_flutter/**"
+      - ".github/workflows/windows-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-preview:
+    if: github.event_name == 'workflow_dispatch' || (!contains(github.event.head_commit.message, '[windows-preview]') && !contains(github.event.head_commit.message, '[android-preview]'))
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Teachingplatform_flutter/platform_ui/package-lock.json
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          channel: stable
+          cache: true
+          cache-key: flutter-3.47.7
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Package the optimized platform UI and build Windows app
+        working-directory: Teachingplatform_flutter
+        shell: pwsh
+        run: |
+          .\tool\package_platform_ui.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Platform UI packaging failed.' }
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter dependency resolution failed.' }
+          flutter build windows --release --dart-define=PLATFORM_API_ORIGIN=https://teaching-platform-one.vercel.app
+          if ($LASTEXITCODE -ne 0) { throw 'Windows release build failed.' }
+
+      - name: Build Windows installer
+        working-directory: Teachingplatform_flutter
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler was not found at $iscc" }
+          $downloadDirectory = Join-Path $env:GITHUB_WORKSPACE 'teachingplatform\public\downloads'
+          New-Item -ItemType Directory -Path $downloadDirectory -Force | Out-Null
+          & $iscc "/O$downloadDirectory" '.\installer\deeb-center.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Windows installer compilation failed.' }
+
+      - name: Update the landing page download link
+        shell: pwsh
+        run: |
+          $version = '2.0.2'
+          $installerName = "DeebCenter-Setup-$version-x64.exe"
+          $installerPath = Join-Path $env:GITHUB_WORKSPACE "teachingplatform\public\downloads\$installerName"
+          if (-not (Test-Path $installerPath)) { throw "Installer output not found: $installerPath" }
+          $sizeMb = [Math]::Max(1, [Math]::Round((Get-Item $installerPath).Length / 1MB))
+          $appPath = Join-Path $env:GITHUB_WORKSPACE 'teachingplatform\src\App.tsx'
+          $source = [System.IO.File]::ReadAllText($appPath)
+          $source = [regex]::Replace($source, 'const installerUrl = "[^"]+";', "const installerUrl = `"/downloads/$installerName`";", 1)
+          $source = [regex]::Replace($source, '<small>Windows installer</small>', "<small>Windows installer · $sizeMb MB</small>", 1)
+          [System.IO.File]::WriteAllText($appPath, $source, [System.Text.UTF8Encoding]::new($false))
+
+          $readmePath = Join-Path $env:GITHUB_WORKSPACE 'teachingplatform\README.md'
+          $readme = [System.IO.File]::ReadAllText($readmePath)
+          $readme = [regex]::Replace($readme, 'Windows preview installer:[^\r\n]*', "Windows preview installer: `public/downloads/$installerName` (version $version, $sizeMb MB).", 1)
+          [System.IO.File]::WriteAllText($readmePath, $readme, [System.Text.UTF8Encoding]::new($false))
+
+      - name: Keep installer available as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeebCenter-Setup-2.0.2-x64
+          path: teachingplatform/public/downloads/DeebCenter-Setup-2.0.2-x64.exe
+          if-no-files-found: error
+
+      - name: Publish installer and updated download link
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add teachingplatform/public/downloads/DeebCenter-Setup-2.0.2-x64.exe teachingplatform/src/App.tsx teachingplatform/README.md
+          git commit -m 'Publish Windows preview 2.0.2 [windows-preview]'
+          git pull --rebase origin '${{ github.ref_name }}'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not rebase the installer publication on the latest main branch.' }
+          git push origin HEAD:${{ github.ref_name }}

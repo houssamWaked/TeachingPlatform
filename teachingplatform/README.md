@@ -11,7 +11,7 @@ npm run dev
 
 ## Downloads
 
-Windows preview installer: `public/downloads/DeebCenter-Setup-2.0.2-x64.exe` (version 2.0.2, 28 MB). The Windows publishing workflow replaces the link and installer with each new preview release.
+Windows preview installer: public/downloads/DeebCenter-Setup-2.0.2-x64.exe (version 2.0.2, 28 MB).
 
 The Android preview is served from `public/downloads/DeebCenter-Android-2.0.2-preview.apk`. The Android preview card links to the current version (2.0.2) and shows its size.
 

@@ -216,6 +216,19 @@ export const api = {
     if (isDemoMode) return null;
     return request<{ url: string; expires_in: number }>(`/admin/lessons/${id}/video-url`, { method: "POST", body: JSON.stringify({ video_id: videoId }) });
   },
+  async adminVideoStatus(videoId: string) {
+    if (isDemoMode) return null;
+    return request<{ status: number | null; encodeProgress: number | null; transcodingMessages: string[] }>(`/admin/videos/${encodeURIComponent(videoId)}/status`);
+  },
+  async waitForVideoProcessing(videoId: string) {
+    for (let attempt = 0; attempt < 24; attempt++) {
+      await delay(5000);
+      const result = await api.adminVideoStatus(videoId);
+      if (!result) return null;
+      if (result.status === 3 || result.status === 4 || result.status === 5 || result.status === 8) return result;
+    }
+    return null;
+  },
   async adminPdfUrl(id: string) {
     if (isDemoMode) return null;
     return request<{ url: string; expires_in: number }>(`/admin/lessons/${id}/pdf-url`, { method: "POST" });
@@ -452,8 +465,13 @@ export const api = {
     title: string,
     onProgress: (percent: number) => void,
   ) {
+    if (!file.size) throw new Error("This video file is empty. Choose another file.");
     if (file.size > 5 * 1024 * 1024 * 1024)
       throw new Error("Video must be smaller than 5 GB.");
+    const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const videoExtensions = new Set(["mp4", "m4v", "mov", "mkv", "webm", "avi", "wmv", "flv", "mpeg", "mpg", "ts", "vod", "amv"]);
+    if (!file.type.startsWith("video/") && !videoExtensions.has(extension))
+      throw new Error("Choose a video file. For best compatibility, use MP4 with H.264 video and AAC audio.");
     if (isDemoMode) {
       for (const percent of [15, 35, 60, 85, 100]) {
         await delay(180);

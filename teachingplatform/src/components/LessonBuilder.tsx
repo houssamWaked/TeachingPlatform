@@ -174,7 +174,23 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
       const saved = await save(patch);
       if (!saved) return false;
       if (blockId) { const savedWithFilename = { ...saved, content: nextContent }; update(savedWithFilename); onSaved(savedWithFilename); }
-      setNotice(tx("Video uploaded. Bunny may need time to finish encoding.", "تم رفع الفيديو. قد يحتاج Bunny إلى بعض الوقت لإنهاء المعالجة.")); return true;
+      setNotice(tx("Video uploaded. Bunny is checking the file…", "تم رفع الفيديو. يتحقق Bunny من الملف…"));
+      void api.waitForVideoProcessing(video_id).then((status) => {
+        if (status?.status === 5 || status?.status === 8) {
+          const providerMessage = status.transcodingMessages.at(-1);
+          setNotice(providerMessage
+            ? tx(`Bunny could not process this video: ${providerMessage}. Re-export it as MP4 (H.264 video, AAC audio) and upload again.`, `تعذر على Bunny معالجة هذا الفيديو: ${providerMessage}. أعد تصديره بصيغة MP4 (فيديو H.264 وصوت AAC) ثم ارفعه مجدداً.`)
+            : tx("Bunny could not process this video. Re-export it as MP4 (H.264 video, AAC audio) and upload again.", "تعذر على Bunny معالجة هذا الفيديو. أعد تصديره بصيغة MP4 (فيديو H.264 وصوت AAC) ثم ارفعه مجدداً."));
+        } else if (status?.status === 3 || status?.status === 4) {
+          setNotice(tx("Video uploaded and processed successfully.", "تم رفع الفيديو ومعالجته بنجاح."));
+        } else {
+          setNotice(tx("Upload finished, but Bunny is still processing or its status could not be confirmed. Check the video again shortly.", "اكتمل الرفع، لكن Bunny ما زال يعالج الفيديو أو تعذر تأكيد حالته. تحقق من الفيديو مجدداً بعد قليل."));
+        }
+      }).catch(() => setNotice(tx(
+        "Video uploaded, but processing status could not be checked. Check the connection and try again shortly.",
+        "تم رفع الفيديو، لكن تعذر التحقق من حالة المعالجة. تحقق من الاتصال وحاول مجدداً بعد قليل.",
+      )));
+      return true;
     } catch (error) { setNotice(error instanceof Error ? error.message : tx("Video upload failed.", "تعذر رفع الفيديو.")); return false; }
     finally { setBusy(false); setUploading(null); }
   }

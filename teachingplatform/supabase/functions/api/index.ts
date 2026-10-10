@@ -293,6 +293,31 @@ Deno.serve(async (req) => {
         const signature = Array.from(signatureBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
         return json({ videoId, libraryId: library, expires, signature });
       }
+      const adminVideoStatus = path.match(/^\/admin\/videos\/([0-9a-f-]{36})\/status\/?$/i);
+      if (adminVideoStatus && req.method === "GET") {
+        const library = Deno.env.get("BUNNY_STREAM_LIBRARY_ID");
+        const key = Deno.env.get("BUNNY_STREAM_API_KEY");
+        if (!library || !key) return fail("Bunny Stream is not configured.", 500);
+        const response = await fetch(`https://video.bunnycdn.com/library/${library}/videos/${adminVideoStatus[1]}`, {
+          headers: { AccessKey: key },
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          console.error("Bunny video status lookup failed", response.status, data);
+          return fail("Unable to check Bunny video processing status.", 502);
+        }
+        return json({
+          status: typeof data.status === "number" ? data.status : null,
+          encodeProgress: typeof data.encodeProgress === "number" ? data.encodeProgress : null,
+          transcodingMessages: Array.isArray(data.transcodingMessages)
+            ? data.transcodingMessages.map((item: unknown) => {
+                if (!item || typeof item !== "object") return "";
+                const message = (item as Record<string, unknown>).message;
+                return typeof message === "string" ? message : "";
+              }).filter(Boolean)
+            : [],
+        });
+      }
       const adminDocument = path.match(/^\/admin\/lessons\/([^/]+)\/document-url\/?$/);
       if (adminDocument && req.method === "POST") {
         const { path: documentPath = "" } = await req.json();

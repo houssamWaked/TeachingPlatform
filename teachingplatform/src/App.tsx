@@ -14,7 +14,7 @@ import {
 import "./landing-page.css";
 
 const installerUrl = "/downloads/DeebCenter-Setup-1.0.0-x64.exe";
-const androidApkUrl = "/downloads/DeebCenter-Android-2.0.1-preview.apk";
+const androidApkUrl = "/downloads/DeebCenter-Android-2.0.2-preview.apk";
 
 function Brand() {
   return (

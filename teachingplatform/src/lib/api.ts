@@ -1,6 +1,7 @@
 import { demoLessons, demoStudents } from "../data/demo";
 import type { Course, Lesson, Question, Student } from "../types";
 import { getDeviceFingerprint } from "./device";
+import { Upload } from "tus-js-client";
 
 // Production uses a same-origin Vercel rewrite so the student session cookie
 // remains first-party on mobile browsers that block cross-site cookies.
@@ -460,32 +461,36 @@ export const api = {
       }
       return `demo-${crypto.randomUUID()}`;
     }
-    const upload = await request<{ videoId: string }>("/admin/video-upload-credentials", {
+    const upload = await request<{
+      videoId: string;
+      libraryId: string;
+      expires: number;
+      signature: string;
+    }>("/admin/video-upload-credentials", {
       method: "POST",
       body: JSON.stringify({ title }),
     });
-    const form = new FormData();
-    form.append("videoId", upload.videoId);
-    form.append("file", file, file.name);
-    const device = await getDeviceFingerprint();
     await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${base}/admin/videos`);
-      xhr.withCredentials = true;
-      xhr.setRequestHeader("x-device-id", device.clientId);
-      xhr.setRequestHeader("x-device-fingerprint", device.fingerprint);
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable)
-          onProgress(Math.round((event.loaded / event.total) * 100));
-      };
-      xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Video upload failed (${xhr.status}).`));
-      xhr.onerror = () =>
-        reject(
-          new Error(
-            "Video upload was interrupted. Check your connection and try again.",
-          ),
-        );
-      xhr.send(form);
+      const tusUpload = new Upload(file, {
+        endpoint: "https://video.bunnycdn.com/tusupload",
+        headers: {
+          AuthorizationSignature: upload.signature,
+          AuthorizationExpire: String(upload.expires),
+          VideoId: upload.videoId,
+          LibraryId: String(upload.libraryId),
+        },
+        metadata: {
+          filename: file.name,
+          filetype: file.type || "application/octet-stream",
+        },
+        chunkSize: 8 * 1024 * 1024,
+        retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000],
+        onError: (error) => reject(new Error(`Video upload failed: ${error.message}`)),
+        onProgress: (uploaded, total) =>
+          onProgress(Math.round((uploaded / total) * 100)),
+        onSuccess: () => resolve(),
+      });
+      tusUpload.start();
     });
     onProgress(100);
     return upload.videoId;

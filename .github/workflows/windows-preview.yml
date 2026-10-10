@@ -91,6 +91,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add teachingplatform/public/downloads/DeebCenter-Setup-2.0.2-x64.exe teachingplatform/src/App.tsx teachingplatform/README.md
           git commit -m 'Publish Windows preview 2.0.2 [windows-preview]'
+          git stash push --include-untracked -m 'Windows build outputs' -- Teachingplatform_flutter
           git pull --rebase origin '${{ github.ref_name }}'
           if ($LASTEXITCODE -ne 0) { throw 'Could not rebase the installer publication on the latest main branch.' }
           git push origin HEAD:${{ github.ref_name }}

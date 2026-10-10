@@ -13,7 +13,7 @@ import {
 } from "@phosphor-icons/react";
 import "./landing-page.css";
 
-const installerUrl = "/downloads/DeebCenter-Setup-1.0.0-x64.exe";
+const installerUrl = "/downloads/DeebCenter-Setup-2.0.2-x64.exe";
 const androidApkUrl = "/downloads/DeebCenter-Android-2.0.2-preview.apk";
 
 function Brand() {
@@ -163,7 +163,7 @@ function LandingPage() {
             <h3>Deeb Center for Windows</h3>
             <p>Install the desktop learning app on your Windows PC.</p>
             <a className="download-card-action download-card-action-primary" href={installerUrl} download><DownloadSimple weight="bold" /> Download for Windows</a>
-            <small>Windows installer</small>
+            <small>Windows installer · 28 MB</small>
           </article>
           <article className="download-card">
             <div className="download-card-topline"><span className="download-card-label download-card-label-preview">Android preview</span><DeviceMobile weight="duotone" /></div>

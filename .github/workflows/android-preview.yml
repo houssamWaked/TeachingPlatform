@@ -1,0 +1,92 @@
+name: Build Android preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Teachingplatform_flutter/**"
+      - ".github/workflows/android-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android-preview:
+    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[android-preview]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: Teachingplatform_flutter/android/gradle/wrapper/gradle-wrapper.properties
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          channel: stable
+          cache: true
+          cache-key: flutter-3.47.7
+
+      - name: Build release APK
+        working-directory: Teachingplatform_flutter
+        run: |
+          flutter pub get
+          flutter build apk --release
+
+      - name: Publish APK to the landing page
+        run: |
+          cp Teachingplatform_flutter/build/app/outputs/flutter-apk/app-release.apk teachingplatform/public/downloads/DeebCenter-Android-2.0.0-preview.apk
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          apk = Path("teachingplatform/public/downloads/DeebCenter-Android-2.0.0-preview.apk")
+          app = Path("teachingplatform/src/App.tsx")
+          source = app.read_text()
+          source = re.sub(
+              r'const androidApkUrl = "[^"]+";',
+              'const androidApkUrl = "/downloads/DeebCenter-Android-2.0.0-preview.apk";',
+              source,
+              count=1,
+          )
+          size_mb = max(1, round(apk.stat().st_size / (1024 * 1024)))
+          source = re.sub(
+              r'<small>Preview APK · [^<]+</small>',
+              f'<small>Preview APK · {size_mb} MB</small>',
+              source,
+              count=1,
+          )
+          source = source.replace(
+              '<p>Install the Android preview package on your phone.</p>',
+              '<p>Install the Android preview package on your phone. Remove version 1.0.0 first if it is already installed.</p>',
+          )
+          app.write_text(source)
+
+          readme = Path("teachingplatform/README.md")
+          docs = readme.read_text()
+          docs = docs.replace(
+              'The Android preview is served from `public/downloads/DeebCenter-Android-1.0.0-preview.apk`. Replace it with the current APK before deploying the landing page. The download card labels it as a preview build.',
+              'The Android preview is served from `public/downloads/DeebCenter-Android-2.0.0-preview.apk`. The Android preview card links to this file and shows its current size.',
+          )
+          readme.write_text(docs)
+          PY
+
+      - name: Keep the APK available as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeebCenter-Android-2.0.0-preview
+          path: teachingplatform/public/downloads/DeebCenter-Android-2.0.0-preview.apk
+          if-no-files-found: error
+
+      - name: Commit the APK and updated download link
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add teachingplatform/public/downloads/DeebCenter-Android-2.0.0-preview.apk teachingplatform/src/App.tsx teachingplatform/README.md
+          git commit -m "Publish Android preview 2.0.0 [android-preview]"
+          git push origin HEAD:${GITHUB_REF_NAME}

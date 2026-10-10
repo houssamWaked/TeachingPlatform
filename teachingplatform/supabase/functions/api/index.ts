@@ -283,7 +283,15 @@ Deno.serve(async (req) => {
           console.error("Bunny video creation failed", response.status, data);
           return fail("Unable to create the Bunny Stream video.", 502);
         }
-        return json({ videoId: data.guid });
+        const videoId = typeof data.guid === "string" ? data.guid : "";
+        if (!videoId) return fail("Bunny Stream did not return a video ID.", 502);
+        const expires = Math.floor(Date.now() / 1000) + 48 * 60 * 60;
+        const signatureBytes = new Uint8Array(await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(`${library}${key}${expires}${videoId}`),
+        ));
+        const signature = Array.from(signatureBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+        return json({ videoId, libraryId: library, expires, signature });
       }
       const adminDocument = path.match(/^\/admin\/lessons\/([^/]+)\/document-url\/?$/);
       if (adminDocument && req.method === "POST") {
@@ -347,23 +355,6 @@ Deno.serve(async (req) => {
         const { data: signed, error: signError } = await db.storage.from("lesson-pdfs").createSignedUrl(imagePath, 300);
         if (signError) throw signError;
         return json({ url: signed.signedUrl, expires_in: 300 });
-      }
-      if (path === "/admin/videos" && req.method === "POST") {
-        const form = await req.formData();
-        const videoId = form.get("videoId");
-        const file = form.get("file");
-        if (typeof videoId !== "string" || !(file instanceof File)) return fail("Video ID and file are required.");
-        if (file.size > 5 * 1024 * 1024 * 1024) return fail("Video must be 5 GB or smaller.");
-        const library = Deno.env.get("BUNNY_STREAM_LIBRARY_ID");
-        const key = Deno.env.get("BUNNY_STREAM_API_KEY");
-        const response = await fetch(`https://video.bunnycdn.com/library/${library}/videos/${encodeURIComponent(videoId)}`, {
-          method: "PUT", headers: { AccessKey: key!, "Content-Type": "application/octet-stream" }, body: file.stream(),
-        });
-        if (!response.ok) {
-          console.error("Bunny video upload failed", response.status, await response.text());
-          return fail("Bunny Stream rejected the video upload.", 502);
-        }
-        return json({ ok: true });
       }
       if (path === "/admin/pdfs" && req.method === "POST") {
         const form = await req.formData();

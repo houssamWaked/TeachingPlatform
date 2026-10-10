@@ -460,35 +460,66 @@ export const api = {
       }
       return `demo-${crypto.randomUUID()}`;
     }
-    const upload = await request<{ videoId: string }>("/admin/video-upload-credentials", {
-      method: "POST",
-      body: JSON.stringify({ title }),
-    });
-    const form = new FormData();
-    form.append("videoId", upload.videoId);
-    form.append("file", file, file.name);
-    const device = await getDeviceFingerprint();
+    let credentials: { videoId: string; libraryId: string; expires: number; signature: string };
+    try {
+      credentials = await request("/admin/video-upload-credentials", {
+        method: "POST",
+        body: JSON.stringify({ title }),
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "TimeoutError") {
+        throw new Error("Preparing the video upload timed out. Check your connection and try again.");
+      }
+      throw error;
+    }
+    const { Upload } = await import("tus-js-client");
     await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${base}/admin/videos`);
-      xhr.withCredentials = true;
-      xhr.setRequestHeader("x-device-id", device.clientId);
-      xhr.setRequestHeader("x-device-fingerprint", device.fingerprint);
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable)
-          onProgress(Math.round((event.loaded / event.total) * 100));
-      };
-      xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Video upload failed (${xhr.status}).`));
-      xhr.onerror = () =>
-        reject(
-          new Error(
-            "Video upload was interrupted. Check your connection and try again.",
-          ),
-        );
-      xhr.send(form);
+      const upload = new Upload(file, {
+        endpoint: "https://video.bunnycdn.com/tusupload",
+        retryDelays: [0, 3000, 5000, 10000, 20000, 60000],
+        chunkSize: 50 * 1024 * 1024,
+        removeFingerprintOnSuccess: true,
+        headers: {
+          AuthorizationSignature: credentials.signature,
+          AuthorizationExpire: String(credentials.expires),
+          VideoId: credentials.videoId,
+          LibraryId: credentials.libraryId,
+        },
+        metadata: {
+          filetype: file.type || "application/octet-stream",
+          title,
+        },
+        onShouldRetry: (error, retryAttempt) => {
+          const status = error.originalResponse?.getStatus();
+          if (status !== undefined && status >= 400 && status < 500 && status !== 409 && status !== 423) return false;
+          return retryAttempt < 5;
+        },
+        onProgress: (bytesUploaded, bytesTotal) => {
+          window.clearTimeout(idleTimer);
+          idleTimer = window.setTimeout(() => {
+            void upload.abort();
+            reject(new Error("Video upload stopped making progress. Check your connection and upload again."));
+          }, 5 * 60 * 1000);
+          onProgress(bytesTotal ? Math.floor((bytesUploaded / bytesTotal) * 100) : 0);
+        },
+        onError: (error) => {
+          window.clearTimeout(idleTimer);
+          reject(new Error(`Video upload failed: ${error.message}`));
+        },
+        onSuccess: () => {
+          window.clearTimeout(idleTimer);
+          resolve();
+        },
+      });
+      let idleTimer = window.setTimeout(() => {
+        void upload.abort();
+        reject(new Error("Video upload stopped making progress. Check your connection and upload again."));
+      }, 5 * 60 * 1000);
+      upload.start();
     });
     onProgress(100);
-    return upload.videoId;
+    return credentials.videoId;
   },
   async createLesson(data: {
     title: string;

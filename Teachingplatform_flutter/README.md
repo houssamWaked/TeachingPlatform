@@ -4,6 +4,8 @@ The Flutter apps package the React platform UI from `platform_ui` and serve it f
 
 The bundled UI sends its same-origin `/api` requests through the app's local server. That server forwards them to `PLATFORM_API_ORIGIN`, which must retain the existing `/api` rewrite to the Supabase Edge Function. This preserves the platform's HttpOnly session-cookie flow without putting Supabase service-role or Bunny secrets in the app. The Supabase Edge Function remains the authority for student and teacher operations.
 
+Teacher video uploads use Bunny Stream's resumable TUS endpoint directly from the app. The Edge Function creates the video and returns a short-lived upload signature scoped to that video; the Bunny API key stays server-side, and video bytes do not pass through Vercel or Supabase.
+
 ## Update the bundled platform UI
 
 Edit the React app under `platform_ui`, then package its production build into Flutter assets:

@@ -43,6 +43,7 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
   const [busy, setBusy] = useState(false);
   const [uploadingCardImage, setUploadingCardImage] = useState(false);
   const [uploading, setUploading] = useState<{ type: "video" | "document"; blockId: string } | null>(null);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const [notice, setNotice] = useState("");
   const [placementError, setPlacementError] = useState("");
   const [activeTab, setActiveTab] = useState("");
@@ -162,13 +163,14 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
   async function uploadVideo(file?: File, blockId?: string): Promise<boolean> {
     if (!file) return false;
     if (blockId) setUploading({ type: "video", blockId });
+    setVideoUploadProgress(0);
     setBusy(true); setNotice(tx("Uploading video…", "جارٍ رفع الفيديو…"));
     try {
       const videoBlocks = [...content.blocks, ...content.sections.flatMap((section) => section.blocks), ...(content.tabs ?? []).flatMap((tab) => tab.blocks)].filter((block) => block.type === "video");
       const selectedVideo = videoBlocks.find((block) => block.id === blockId);
       const fallbackTitle = blockId ? `Part ${Math.max(1, videoBlocks.findIndex((block) => block.id === blockId) + 1)}` : "";
       const videoTitle = [lesson.title, selectedVideo?.title?.trim() || fallbackTitle].filter(Boolean).join(" - ");
-      const video_id = await api.uploadVideo(file, videoTitle, () => {});
+      const video_id = await api.uploadVideo(file, videoTitle, setVideoUploadProgress);
       const nextContent = blockId ? markMediaBlockAttached(blockId, undefined, video_id, file.name) : content;
       const patch: Partial<Lesson> = blockId ? { content: nextContent } : { video_id, content: nextContent };
       const saved = await save(patch);
@@ -176,7 +178,7 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
       if (blockId) { const savedWithFilename = { ...saved, content: nextContent }; update(savedWithFilename); onSaved(savedWithFilename); }
       setNotice(tx("Video uploaded. Bunny may need time to finish encoding.", "تم رفع الفيديو. قد يحتاج Bunny إلى بعض الوقت لإنهاء المعالجة.")); return true;
     } catch (error) { setNotice(error instanceof Error ? error.message : tx("Video upload failed.", "تعذر رفع الفيديو.")); return false; }
-    finally { setBusy(false); setUploading(null); }
+    finally { setBusy(false); setUploading(null); setVideoUploadProgress(0); }
   }
   async function uploadPdf(file?: File, blockId?: string): Promise<boolean> {
     if (!file) return false;
@@ -328,7 +330,7 @@ export function LessonBuilder({ lesson: initial, onClose, onSaved, video }: { le
               </div>
               <label className="mobile-card-image-picker" htmlFor="builder-card-image-input-mobile"><img src={theme === "dark" ? "/figma/dark-lesson-builder-mobile-image.svg" : "/figma/lesson-builder-desktop-image.svg"} alt="" /><span>{uploadingCardImage ? tx("Uploading image…", "جارٍ رفع الصورة…") : content.pageStyle?.cardImageName || tx("Upload lesson card image…", "ارفع صورة بطاقة الدرس…")}</span><input id="builder-card-image-input-mobile" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy || uploadingCardImage} onChange={(event) => { void uploadCardImage(event.target.files?.[0]); event.target.value = ""; }} /></label>
               <button type="button" className="mobile-builder-save" disabled={busy} aria-busy={busy} onClick={() => void save()}>{busy && <span className="ui-spinner" aria-hidden="true" />}{tx("Save Changes", "حفظ التغييرات")}</button>
-              {selectedBlock ? <BlockInspector block={selectedBlock} onChange={(patch) => updateBlock(selectedBlock.id, patch)} uploadVideo={uploadVideo} uploadPdf={uploadPdf} uploadImage={uploadImage} busy={busy} uploading={uploading?.blockId === selectedBlock.id ? uploading.type : undefined} lesson={lesson} onMoveVideoPart={(direction) => moveVideoPart(selectedBlock.id, selectedLocation, direction)} canMoveVideoPartUp={selectedVideoIndex > 0} canMoveVideoPartDown={selectedVideoIndex >= 0 && selectedVideoIndex < selectedVideoBlocks.length - 1} videoPartNumber={selectedBlock.type === "video" && selectedVideoIndex >= 0 ? selectedVideoIndex + 1 : undefined} /> : <div className="builder-settings-empty"><img src={theme === "dark" ? "/figma/dark-lesson-builder-desktop-settings.svg" : "/figma/lesson-builder-desktop-settings.svg"} alt="" /><p>{tx("No block selected. Click any element inside the workspace to configure.", "لم يتم تحديد مكوّن. انقر فوق أي عنصر في مساحة العمل لتعديله.")}</p></div>}
+              {selectedBlock ? <BlockInspector block={selectedBlock} onChange={(patch) => updateBlock(selectedBlock.id, patch)} uploadVideo={uploadVideo} uploadPdf={uploadPdf} uploadImage={uploadImage} busy={busy} uploading={uploading?.blockId === selectedBlock.id ? uploading.type : undefined} uploadProgress={videoUploadProgress} lesson={lesson} onMoveVideoPart={(direction) => moveVideoPart(selectedBlock.id, selectedLocation, direction)} canMoveVideoPartUp={selectedVideoIndex > 0} canMoveVideoPartDown={selectedVideoIndex >= 0 && selectedVideoIndex < selectedVideoBlocks.length - 1} videoPartNumber={selectedBlock.type === "video" && selectedVideoIndex >= 0 ? selectedVideoIndex + 1 : undefined} /> : <div className="builder-settings-empty"><img src={theme === "dark" ? "/figma/dark-lesson-builder-desktop-settings.svg" : "/figma/lesson-builder-desktop-settings.svg"} alt="" /><p>{tx("No block selected. Click any element inside the workspace to configure.", "لم يتم تحديد مكوّن. انقر فوق أي عنصر في مساحة العمل لتعديله.")}</p></div>}
             </>}
           </aside>
         </div>

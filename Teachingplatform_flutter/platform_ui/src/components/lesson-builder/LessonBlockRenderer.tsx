@@ -1,9 +1,20 @@
+import { lazy, Suspense } from "react";
 import { ArrowUpRight, FilePdf, Image, LinkSimple, VideoCamera } from "@phosphor-icons/react";
 import type { Lesson, LessonBlock } from "../../types";
-import { PdfPageReader } from "../PdfPageReader";
-import { WordDocumentReader } from "../WordDocumentReader";
 import { useLessonImageUrl } from "./useLessonImageUrl";
 import { useLocale } from "../../context/LocaleState";
+
+const PdfPageReader = lazy(() => import("../PdfPageReader").then((module) => ({ default: module.PdfPageReader })));
+const WordDocumentReader = lazy(() => import("../WordDocumentReader").then((module) => ({ default: module.WordDocumentReader })));
+
+function DocumentViewerLoading({ format }: { format: "PDF" | "Word" }) {
+  return (
+    <div className="document-viewer-loading" role="status" aria-live="polite" aria-busy="true">
+      <span className="ui-spinner" aria-hidden="true" />
+      <span>Loading {format} viewer…</span>
+    </div>
+  );
+}
 
 export function LessonBlockRenderer({ block, lesson, video, admin = false, onPdfViewed }: {
   block: LessonBlock;
@@ -33,9 +44,9 @@ export function LessonBlockRenderer({ block, lesson, video, admin = false, onPdf
   const videoId = block.videoId || (block.id === "legacy-video" ? lesson.video_id : undefined);
   if (block.type === "video" && !block.mediaEmpty && videoId) return <div key={videoId} style={mediaStyle} className="lesson-inline-media">{video(lesson.id, videoId)}</div>;
   if (block.type === "video") return <div style={mediaStyle} className="canvas-media-placeholder"><VideoCamera /> {tx("Choose a video file in block settings", "اختر ملف فيديو من إعدادات المكوّن")}</div>;
-  if (block.type === "pdf" && !block.mediaEmpty && pdfPath) return <div style={mediaStyle} className="lesson-inline-media"><PdfPageReader lessonId={lesson.id} documentPath={block.filePath ? pdfPath : undefined} admin={admin} onViewed={onPdfViewed} /></div>;
+  if (block.type === "pdf" && !block.mediaEmpty && pdfPath) return <div style={mediaStyle} className="lesson-inline-media"><Suspense fallback={<DocumentViewerLoading format="PDF" />}><PdfPageReader lessonId={lesson.id} documentPath={block.filePath ? pdfPath : undefined} admin={admin} onViewed={onPdfViewed} /></Suspense></div>;
   if (block.type === "pdf") return <div style={mediaStyle} className="canvas-media-placeholder"><FilePdf /> {tx("Your PDF block is empty. Upload a PDF in block settings.", "مكوّن PDF فارغ. ارفع ملف PDF من إعدادات المكوّن.")}</div>;
-  if (block.type === "word" && !block.mediaEmpty && wordPath) return <div style={mediaStyle} className="lesson-inline-media"><WordDocumentReader lessonId={lesson.id} documentPath={block.filePath ? wordPath : undefined} admin={admin} onViewed={onPdfViewed} /></div>;
+  if (block.type === "word" && !block.mediaEmpty && wordPath) return <div style={mediaStyle} className="lesson-inline-media"><Suspense fallback={<DocumentViewerLoading format="Word" />}><WordDocumentReader lessonId={lesson.id} documentPath={block.filePath ? wordPath : undefined} admin={admin} onViewed={onPdfViewed} /></Suspense></div>;
   if (block.type === "word") return <div style={mediaStyle} className="canvas-media-placeholder"><FilePdf /> {tx("Your Word document block is empty. Upload a document in block settings.", "مكوّن مستند Word فارغ. ارفع مستنداً من إعدادات المكوّن.")}</div>;
   return null;
 }

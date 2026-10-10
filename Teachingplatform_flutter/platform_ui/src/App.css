@@ -1476,6 +1476,15 @@ textarea:focus {
 .lesson-embed { aspect-ratio: 16 / 9; }
 .lesson-embed iframe { width: 100%; height: 100%; border: 0; border-radius: 12px; }
 .lesson-inline-media { margin-block: 10px; }
+.document-viewer-loading {
+  display: flex;
+  min-height: 180px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: var(--muted, #68746e);
+  font-size: 14px;
+}
 .publish-badge { border-radius: 99px; padding: 5px 9px; background: #fff3da; color: #8b5d0a; font-size: 11px; font-weight: 750; }
 .publish-badge.is-published { background: #e5f5ec; color: #187746; }
 .pdf-reader { width: 100%; }
@@ -2087,6 +2096,16 @@ button[aria-pressed="true"],
   vertical-align: -.14em;
   animation: ui-spin .7s linear infinite;
 }
+.route-loading {
+  display: flex;
+  min-height: 100svh;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--muted, #68746e);
+  font-size: 14px;
+}
+.route-loading .ui-spinner { width: 18px; height: 18px; }
 [aria-busy="true"] { cursor: progress; }
 [aria-busy="true"] .ui-spinner { margin-inline-end: 2px; }
 .form-success {
@@ -3163,7 +3182,8 @@ body { background: var(--paper); color: var(--ink); }
 .live-builder > .builder-fields input { min-height: 42px; padding: 8px 11px; border-radius: 9px; background: #fff; font-size: 13px; }
 .live-builder > .builder-fields input[type="file"] { min-height: 42px; padding: 6px; font-size: 11px; }
 .tab-placement-error { margin: 10px 0; padding: 12px 14px; border: 1px solid #f2b4b4; border-radius: 10px; background: #fff1f0; color: #a52323; font-size: 13px; }
-.block-upload-loading { display: flex; align-items: center; gap: 8px; color: #27695d; }
+.block-upload-loading { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; color: #27695d; }
+.video-upload-progress { grid-column: 1 / -1; width: 100%; height: 8px; accent-color: #27695d; }
 .live-editor-grid { grid-template-columns: 232px minmax(0,1fr) 292px; border-top-color: #dfe6df; }
 .component-palette, .properties-panel { padding: 17px 14px; background: #f9faf7; scrollbar-width: thin; scrollbar-color: #c6d0c9 transparent; }
 .component-palette { border-inline-end-color: #e0e6df; }

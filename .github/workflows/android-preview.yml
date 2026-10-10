@@ -40,17 +40,25 @@ jobs:
 
       - name: Publish APK to the landing page
         run: |
-          cp Teachingplatform_flutter/build/app/outputs/flutter-apk/app-release.apk teachingplatform/public/downloads/DeebCenter-Android-2.0.0-preview.apk
+          VERSION="$(sed -n 's/^version: \([^+]*\)+.*/\1/p' Teachingplatform_flutter/pubspec.yaml)"
+          APK_NAME="DeebCenter-Android-${VERSION}-preview.apk"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "APK_NAME=${APK_NAME}" >> "$GITHUB_ENV"
+          export VERSION APK_NAME
+          cp Teachingplatform_flutter/build/app/outputs/flutter-apk/app-release.apk "teachingplatform/public/downloads/${APK_NAME}"
           python3 - <<'PY'
           from pathlib import Path
+          import os
           import re
 
-          apk = Path("teachingplatform/public/downloads/DeebCenter-Android-2.0.0-preview.apk")
+          apk_name = os.environ["APK_NAME"]
+          version = os.environ["VERSION"]
+          apk = Path("teachingplatform/public/downloads") / apk_name
           app = Path("teachingplatform/src/App.tsx")
           source = app.read_text()
           source = re.sub(
               r'const androidApkUrl = "[^"]+";',
-              'const androidApkUrl = "/downloads/DeebCenter-Android-2.0.0-preview.apk";',
+              f'const androidApkUrl = "/downloads/{apk_name}";',
               source,
               count=1,
           )
@@ -61,17 +69,21 @@ jobs:
               source,
               count=1,
           )
-          source = source.replace(
-              '<p>Install the Android preview package on your phone.</p>',
-              '<p>Install the Android preview package on your phone. Remove version 1.0.0 first if it is already installed.</p>',
+          source = re.sub(
+              r'<p>Install the Android preview package on your phone\.[^<]*</p>',
+              '<p>Uninstall an older preview build before installing this update.</p>',
+              source,
+              count=1,
           )
           app.write_text(source)
 
           readme = Path("teachingplatform/README.md")
           docs = readme.read_text()
-          docs = docs.replace(
-              'The Android preview is served from `public/downloads/DeebCenter-Android-1.0.0-preview.apk`. Replace it with the current APK before deploying the landing page. The download card labels it as a preview build.',
-              'The Android preview is served from `public/downloads/DeebCenter-Android-2.0.0-preview.apk`. The Android preview card links to this file and shows its current size.',
+          docs = re.sub(
+              r'The Android preview is served from `public/downloads/[^`]+`\.[^\n]*',
+              f'The Android preview is served from `public/downloads/{apk_name}`. The Android preview card links to the current version ({version}) and shows its size.',
+              docs,
+              count=1,
           )
           readme.write_text(docs)
           PY
@@ -79,14 +91,14 @@ jobs:
       - name: Keep the APK available as a build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DeebCenter-Android-2.0.0-preview
-          path: teachingplatform/public/downloads/DeebCenter-Android-2.0.0-preview.apk
+          name: ${{ env.APK_NAME }}
+          path: teachingplatform/public/downloads/${{ env.APK_NAME }}
           if-no-files-found: error
 
       - name: Commit the APK and updated download link
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add teachingplatform/public/downloads/DeebCenter-Android-2.0.0-preview.apk teachingplatform/src/App.tsx teachingplatform/README.md
-          git commit -m "Publish Android preview 2.0.0 [android-preview]"
+          git add "teachingplatform/public/downloads/${APK_NAME}" teachingplatform/src/App.tsx teachingplatform/README.md
+          git commit -m "Publish Android preview ${VERSION} [android-preview]"
           git push origin HEAD:${GITHUB_REF_NAME}

@@ -13,13 +13,22 @@ export const db = createClient(projectUrl, serviceKey, { auth: { persistSession:
 
 export async function requireStudent(req: Request) {
   const rawToken = readCookie(req, 'lp_session')
-  const deviceId = req.headers.get('x-device-fingerprint')
+  // x-device-id is stable and present in current clients. Keep accepting the
+  // legacy hash as a fallback while web and Edge Function versions roll out.
+  const deviceId = req.headers.get('x-device-id') ?? req.headers.get('x-device-fingerprint')
   if (!rawToken || !deviceId) throw new Response('Missing session', { status: 401 })
   const tokenHash = await sha256(rawToken)
   const { data, error } = await db.from('students').select('id,name,device_id,codes!students_code_id_fkey(code)').eq('session_token', tokenHash).maybeSingle()
   if (error || !data) throw new Response('Invalid session', { status: 401 })
-  if (data.device_id !== deviceId) throw new Response('This account is locked to another device.', { status: 403 })
-  return data as { id: string; name: string; device_id: string; codes: { code: string } }
+  // The session cookie is the authenticated credential. Older releases bound
+  // accounts to a hash that included screen, timezone, and browser details,
+  // which can change on the same phone. Migrate valid sessions to the stable
+  // browser ID instead of locking the student out after those changes.
+  if (data.device_id !== deviceId) {
+    const { error: rebindError } = await db.from('students').update({ device_id: deviceId }).eq('id', data.id)
+    if (rebindError) throw new Response('Could not update this device session.', { status: 500 })
+  }
+  return { ...data, device_id: deviceId } as { id: string; name: string; device_id: string; codes: { code: string } }
 }
 
 export async function requireAdmin(req: Request) {

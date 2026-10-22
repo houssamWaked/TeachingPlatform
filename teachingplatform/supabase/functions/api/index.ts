@@ -146,18 +146,53 @@ Deno.serve(async (req) => {
         return fail("Too many attempts. Try again in 15 minutes.", 429);
       await db.from("redemption_attempts").insert({ ip_hash: ipHash });
       const body = await req.json();
-      const fingerprint =
-        req.headers.get("x-device-fingerprint") ?? body.fingerprint;
+      const stableDeviceId =
+        body.clientId ?? req.headers.get("x-device-id") ?? req.headers.get("x-device-fingerprint");
+      const legacyFingerprint = body.legacyFingerprint ?? body.fingerprint;
       const studentName = typeof body.name === "string" ? body.name.replace(/\s+/g, " ").trim() : "";
-      if (!body.code || !fingerprint || !studentName)
+      if (typeof stableDeviceId !== "string" || !stableDeviceId || stableDeviceId.length > 128 || !body.code || !studentName)
         return fail("Code, name, and device fingerprint are required.");
       if (studentName.length > 80)
         return fail("Name must be 80 characters or fewer.");
+
+      // Existing installations stored the old environment-dependent hash.
+      // Permit that hash only when it matches the code's current owner, then
+      // migrate the account to the stable browser ID after redemption.
+      const normalizedCode = String(body.code).trim().toUpperCase();
+      let rpcDeviceId = stableDeviceId;
+      const { data: codeRecord } = await db
+        .from("codes")
+        .select("is_used,used_by")
+        .eq("code", normalizedCode)
+        .maybeSingle();
+      if (codeRecord?.is_used && codeRecord.used_by) {
+        const { data: existingStudent } = await db
+          .from("students")
+          .select("id,device_id")
+          .eq("id", codeRecord.used_by)
+          .maybeSingle();
+        const currentSession = readCookie(req, "lp_session");
+        const currentSessionHash = currentSession ? await sha256(currentSession) : null;
+        const { data: sessionStudent } = currentSessionHash
+          ? await db.from("students").select("id").eq("session_token", currentSessionHash).maybeSingle()
+          : { data: null };
+        if (existingStudent && sessionStudent?.id === existingStudent.id) {
+          const { error: rebindError } = await db
+            .from("students")
+            .update({ device_id: stableDeviceId })
+            .eq("id", existingStudent.id);
+          if (rebindError) return fail("Could not update this device session.", 500);
+        } else if (existingStudent?.device_id === stableDeviceId) {
+          rpcDeviceId = stableDeviceId;
+        } else if (existingStudent?.device_id && legacyFingerprint === existingStudent.device_id) {
+          rpcDeviceId = legacyFingerprint;
+        }
+      }
       const rawToken = crypto.randomUUID() + crypto.randomUUID();
       const tokenHash = await sha256(rawToken);
       const { error } = await db.rpc("redeem_access_code", {
         p_code: body.code,
-        p_device_id: fingerprint,
+        p_device_id: rpcDeviceId,
         p_token_hash: tokenHash,
         p_student_name: studentName,
       });
@@ -168,6 +203,7 @@ Deno.serve(async (req) => {
             : "This code is invalid or has already been used.",
           403,
         );
+      await db.from("students").update({ device_id: stableDeviceId }).eq("session_token", tokenHash);
       const headers = new Headers(corsHeaders);
       headers.append("Set-Cookie", cookie("lp_session", rawToken));
       headers.append(

@@ -586,8 +586,9 @@ export function AdminPage() {
                       <UserCircle weight="duotone" />
                       <strong>{s.name}</strong>
                     </span>
-                    <code>{s.code}</code>
+                    <code data-label={tx("Access code", "رمز الدخول")}>{s.code}</code>
                     <span
+                      data-label={tx("Device", "الجهاز")}
                       className={
                         s.device_locked ? "device-locked" : "device-open"
                       }
@@ -602,7 +603,7 @@ export function AdminPage() {
                         </>
                       )}
                     </span>
-                    <span className="student-row-actions">
+                    <span className="student-row-actions" data-label={tx("Actions", "الإجراءات")}>
                       <button className="text-button" disabled={resettingStudentId === s.id} aria-busy={resettingStudentId === s.id} onClick={async () => {
                         setResettingStudentId(s.id); setActionError("");
                         try { await api.resetDevice(s.id); setStudents((v) => v.map((x) => x.id === s.id ? { ...x, device_locked: false } : x)); }
